@@ -40,34 +40,28 @@ const variantCopy: ProductCopy = {
 
 const baselineEvaluation = evaluateCopy(product.baseline, evidence, "Current Shopify copy");
 
-let state: AppState = {
-  surface: "studio",
-  product,
-  evidence,
-  variant: {
+function initialVariant(): AppState["variant"] {
+  return {
     id: "variant-urban-24-v1",
     ...variantCopy,
+    bullets: [...variantCopy.bullets],
     status: "draft",
     evidenceIds: evidence.map((item) => item.id),
     approvedDigest: null,
     approvedAt: null,
     publishedAt: null,
-  },
-  baselineEvaluation,
-  variantEvaluation: null,
-  adsPackage: {
+  };
+}
+
+function initialAdsPackage(): AppState["adsPackage"] {
+  return {
     status: "not_prepared",
     campaignStatus: "not_created",
     feed: null,
     adTemplate: null,
     disclaimer: "Demo projection only. No Ads API call, campaign activation or spend can occur.",
-  },
-  cartQuantity: 0,
-  webmcpAvailable: false,
-  activities: [
-    activity("System", "Evidence synced", "8 verified Shopify and operations facts are ready for agent use."),
-  ],
-};
+  };
+}
 
 const listeners = new Set<() => void>();
 
@@ -80,6 +74,27 @@ function activity(actor: Activity["actor"], action: string, detail: string): Act
     time: new Date().toISOString(),
   };
 }
+
+function initialState(webmcpAvailable: boolean, resetByMerchant = false): AppState {
+  return {
+    surface: "studio",
+    product,
+    evidence,
+    variant: initialVariant(),
+    baselineEvaluation,
+    variantEvaluation: null,
+    adsPackage: initialAdsPackage(),
+    cartQuantity: 0,
+    webmcpAvailable,
+    activities: [
+      resetByMerchant
+        ? activity("Merchant", "Demo reset", "Cleared evaluation, approval, channel projections and cart state. Returned to the verified baseline.")
+        : activity("System", "Evidence synced", "8 verified Shopify and operations facts are ready for agent use."),
+    ],
+  };
+}
+
+let state: AppState = initialState(false);
 
 function update(recipe: (current: AppState) => AppState): AppState {
   state = recipe(state);
@@ -193,16 +208,9 @@ export const appStore = {
     return safeQuantity;
   },
   reset() {
-    state = {
-      ...state,
-      surface: "studio",
-      variant: { ...state.variant, status: "draft", approvedDigest: null, approvedAt: null, publishedAt: null },
-      variantEvaluation: null,
-      adsPackage: { ...state.adsPackage, status: "not_prepared", campaignStatus: "not_created", feed: null, adTemplate: null },
-      cartQuantity: 0,
-      activities: [activity("System", "Demo reset", "Returned the workspace to its initial review state.")],
-    };
+    state = initialState(state.webmcpAvailable, true);
     listeners.forEach((listener) => listener());
+    return state;
   },
 };
 

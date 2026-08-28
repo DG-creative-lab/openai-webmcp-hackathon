@@ -63,13 +63,16 @@ pnpm build
 
 ## Demo flow
 
-1. In **Growth studio**, run the buyer-intent battery.
-2. Stage the tested variant.
-3. Approve the exact variant in the human UI.
-4. Publish it to the demo storefront.
-5. Prepare the paid projection.
-6. Switch to **Shopper view** and see the same approved copy.
-7. Ask Codex to inspect the growth workspace, search for a rainproof 16-inch laptop bag, or update the demo cart through the site tools.
+1. Select **Reset demo** and confirm to start from the verified baseline.
+2. In **Growth studio**, run the buyer-intent battery.
+3. Stage the tested variant.
+4. Approve the exact variant in the human UI.
+5. Publish it to the demo storefront.
+6. Prepare the paid projection.
+7. Switch to **Shopper view** and see the same approved copy.
+8. Ask Codex to inspect the growth workspace, search for a rainproof 16-inch laptop bag, or update the demo cart through the site tools.
+
+The reset control is deliberately merchant-only and is not exposed as a WebMCP tool. It clears evaluation, approval, channel projections, cart state and prior activity while preserving the verified product evidence and the browser's WebMCP registration.
 
 ## Product boundaries
 

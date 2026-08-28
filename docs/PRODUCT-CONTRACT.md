@@ -16,6 +16,7 @@ A judge can watch a generic listing move from 0/8 to 8/8 deterministic buyer-int
 4. Every agent action changes the same state the merchant sees.
 5. Every important effect produces a visible activity event.
 6. The app remains useful when WebMCP is unavailable.
+7. Only the visible merchant interface may reset the demonstration workspace.
 
 ## Current adapters
 

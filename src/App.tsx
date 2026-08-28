@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { appStore } from "./store/appStore";
 import type { Activity, IntentResult, VariantStatus } from "./domain/types";
 import "./styles.css";
@@ -20,6 +20,21 @@ function StatusDot({ tone = "neutral" }: { tone?: "neutral" | "good" | "warning"
 
 function AppHeader() {
   const state = useSyncExternalStore(appStore.subscribe, appStore.getState);
+  const [resetArmed, setResetArmed] = useState(false);
+  const [resetComplete, setResetComplete] = useState(false);
+
+  useEffect(() => {
+    if (!resetComplete) return;
+    const timeout = window.setTimeout(() => setResetComplete(false), 2600);
+    return () => window.clearTimeout(timeout);
+  }, [resetComplete]);
+
+  const confirmReset = () => {
+    appStore.reset();
+    setResetArmed(false);
+    setResetComplete(true);
+  };
+
   return (
     <header className="app-header">
       <button className="wordmark" onClick={() => appStore.setSurface("studio")} aria-label="Open Conversion Lab studio">
@@ -31,10 +46,34 @@ function AppHeader() {
         <button className={state.surface === "studio" ? "is-active" : ""} onClick={() => appStore.setSurface("studio")}>Growth studio</button>
         <button className={state.surface === "storefront" ? "is-active" : ""} onClick={() => appStore.setSurface("storefront")}>Shopper view <span className="count">{state.cartQuantity}</span></button>
       </nav>
-      <div className="connection-state">
-        <StatusDot tone={state.webmcpAvailable ? "good" : "neutral"} />
-        <span>{state.webmcpAvailable ? "9 site tools live" : "WebMCP-ready"}</span>
+      <div className="header-actions">
+        <div className="connection-state">
+          <StatusDot tone={state.webmcpAvailable ? "good" : "neutral"} />
+          <span>{state.webmcpAvailable ? "9 site tools live" : "WebMCP-ready"}</span>
+        </div>
+        <button
+          type="button"
+          className="reset-trigger"
+          aria-expanded={resetArmed}
+          aria-controls="reset-confirmation"
+          onClick={() => { setResetArmed((current) => !current); setResetComplete(false); }}
+        >
+          <span aria-hidden="true">↺</span> Reset demo
+        </button>
       </div>
+      {resetArmed && (
+        <aside id="reset-confirmation" className="reset-confirmation" role="alertdialog" aria-labelledby="reset-title" aria-describedby="reset-description">
+          <div>
+            <strong id="reset-title">Return to the verified baseline?</strong>
+            <span id="reset-description">Clears evaluation, approval, channel projections and cart. Product evidence remains.</span>
+          </div>
+          <div className="reset-confirmation__actions">
+            <button type="button" onClick={() => setResetArmed(false)}>Cancel</button>
+            <button type="button" className="reset-confirm" onClick={confirmReset}>Confirm reset</button>
+          </div>
+        </aside>
+      )}
+      {resetComplete && <div className="reset-complete" role="status" aria-live="polite"><StatusDot tone="good" /> Demo returned to baseline</div>}
     </header>
   );
 }
