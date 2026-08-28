@@ -7,12 +7,12 @@ const journeySteps = [
   { number: "01", label: "Evidence draft", actor: "Agent", effect: "Draft only" },
   { number: "02", label: "Buyer evaluation", actor: "Agent", effect: "Simulation" },
   { number: "03", label: "Review stage", actor: "Agent", effect: "No publish" },
-  { number: "04", label: "Exact approval", actor: "Merchant", effect: "Human gate" },
+  { number: "04", label: "Exact approval", actor: "Browser user", effect: "UI checkpoint" },
   { number: "05", label: "Channel projection", actor: "Agent", effect: "Demo + £0 paid" },
   { number: "06", label: "Shopper cart", actor: "Agent", effect: "No checkout" },
 ];
 
-const starterPrompt = "Inspect this Conversion Lab workspace. Create and evaluate an evidence-led product variant, stage it for merchant review, and stop before approval.";
+const starterPrompt = "Inspect this Conversion Lab workspace. Create and evaluate an evidence-led product variant, stage it at the visible review checkpoint, and stop before approval.";
 const continuationPrompt = "Continue the approved journey: publish the exact variant, prepare the PAUSED Ads projection, find the product for a waterproof 16-inch laptop need, and set the demo cart quantity to 2.";
 
 function journeyGuide(state: AppState) {
@@ -26,18 +26,18 @@ function journeyGuide(state: AppState) {
     return { progress: 4, actor: "Agent", effect: "Paid projection", title: "Project the approved truth", instruction: "Prepare the OpenAI Ads package. It must remain PAUSED, credential-free and £0 spend.", prompt: continuationPrompt };
   }
   if (state.variant.status === "approved") {
-    return { progress: 4, actor: "Agent", effect: "Demo publish", title: "Continue after human approval", instruction: "Publish the exact approved digest to the demo storefront, then prepare the paid projection.", prompt: continuationPrompt };
+    return { progress: 4, actor: "Agent", effect: "Demo publish", title: "Continue after visible approval", instruction: "Publish the exact approved digest to the demo storefront, then prepare the paid projection.", prompt: continuationPrompt };
   }
   if (state.variant.status === "staged") {
-    return { progress: 3, actor: "Merchant", effect: "Human gate", title: "Merchant approval required", instruction: "Review the tested copy and select Approve exact variant. No site tool can perform this action.", prompt: null };
+    return { progress: 3, actor: "Browser user", effect: "UI checkpoint", title: "Visible approval checkpoint", instruction: "Review the tested copy and select Approve exact variant. Approval is absent from site tools, but this credential-free demo does not authenticate the browser actor.", prompt: null };
   }
   if (state.variant.status === "draft" && state.variantEvaluation) {
-    return { progress: 2, actor: "Agent", effect: "Review stage", title: "Stage the tested variant", instruction: "Move the 8/8 draft into merchant review, then stop. Staging does not approve or publish it.", prompt: starterPrompt };
+    return { progress: 2, actor: "Agent", effect: "Review stage", title: "Stage the tested variant", instruction: "Move the 8/8 draft to visible review, then stop. Staging does not approve or publish it.", prompt: starterPrompt };
   }
   if (state.variant.status === "draft") {
     return { progress: 1, actor: "Agent", effect: "Simulation", title: "Run the fixed buyer test", instruction: "Evaluate this evidence-led draft against the same eight buyer needs used for the baseline.", prompt: starterPrompt };
   }
-  return { progress: 0, actor: "Agent", effect: "Read + draft", title: "Start with one agent prompt", instruction: "The agent inspects verified evidence, creates a better draft, evaluates it and stops at the human gate.", prompt: starterPrompt };
+  return { progress: 0, actor: "Agent", effect: "Read + draft", title: "Start with one agent prompt", instruction: "The agent inspects verified evidence, creates a better draft, evaluates it and stops at the visible review checkpoint.", prompt: starterPrompt };
 }
 
 function formatTime(value: string) {
@@ -120,7 +120,7 @@ function ScoreRing({ score, total, muted = false }: { score: number; total: numb
 function JudgeGuide({ state }: { state: AppState }) {
   const guide = journeyGuide(state);
   return (
-    <section className={`judge-guide ${guide.effect === "Human gate" ? "is-human-gate" : ""}`} aria-labelledby="judge-guide-title">
+    <section className={`judge-guide ${guide.effect === "UI checkpoint" ? "is-review-gate" : ""}`} aria-labelledby="judge-guide-title">
       <div className="guide-copy">
         <div className="guide-kicker"><span>Guided judge journey</span><span>{guide.progress === 6 ? "06 / 06" : `${String(guide.progress + 1).padStart(2, "0")} / 06`}</span></div>
         <div className="guide-actor"><span>{guide.actor}</span><span>{guide.effect}</span></div>
@@ -177,12 +177,12 @@ function Studio() {
 
   const runPrimaryAction = () => {
     try {
-      if (state.variant.status === "baseline") appStore.generateVariant("Merchant");
-      else if (!state.variantEvaluation) appStore.runEvaluation("Merchant");
-      else if (canStage) appStore.stageVariant("Merchant");
-      else if (canApprove) appStore.approveVariant();
-      else if (canPublish) appStore.publishVariant("Merchant");
-      else if (state.adsPackage.status !== "ready") appStore.prepareAds("Merchant");
+      if (state.variant.status === "baseline") appStore.generateVariant("Browser user");
+      else if (!state.variantEvaluation) appStore.runEvaluation("Browser user");
+      else if (canStage) appStore.stageVariant("Browser user");
+      else if (canApprove) appStore.recordVisibleApproval();
+      else if (canPublish) appStore.publishVariant("Browser user");
+      else if (state.adsPackage.status !== "ready") appStore.prepareAds("Browser user");
       else appStore.setSurface("storefront");
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "The action could not be completed.");
@@ -225,10 +225,10 @@ function Studio() {
             <div className="score-copy"><strong>{score === 8 ? "8 buyer needs resolved" : "Evidence is ready"}</strong><span>{score === 8 ? "Every match can be traced to a source." : "Run the same task battery agents will face."}</span></div>
           </div>
 
-          <button className={`primary-action ${canApprove ? "is-merchant-gate" : ""}`} onClick={runPrimaryAction} disabled={isComplete}>
+          <button className={`primary-action ${canApprove ? "is-review-gate" : ""}`} onClick={runPrimaryAction} disabled={isComplete}>
             <span>{actionLabel}</span><span aria-hidden="true">↗</span>
           </button>
-          <p className={`authority-note ${canApprove ? "is-merchant-gate" : ""}`}><span>{canApprove ? "Merchant gate" : "Authority boundary"}</span>{canApprove ? "The agent has stopped. Only the visible merchant control can approve this exact digest." : "Agents may draft, test and stage. A merchant approves. Paid activation is never available."}</p>
+          <p className={`authority-note ${canApprove ? "is-review-gate" : ""}`}><span>{canApprove ? "Demo review" : "Authority boundary"}</span>{canApprove ? "Approval is absent from site tools. This local demo does not authenticate whether a person or browser automation selects this control." : "Agents may draft, test and stage. Production publication requires authenticated merchant authority; paid activation is never available here."}</p>
         </div>
       </section>
 
@@ -251,7 +251,7 @@ function Studio() {
               {state.evidence.slice(0, 5).map((item) => (
                 <div key={item.id}><StatusDot tone="good" /><span><strong>{item.value}</strong><small>{item.source}</small></span></div>
               ))}
-              <button onClick={() => appStore.generateVariant("Merchant")}>Regenerate from evidence</button>
+              <button onClick={() => appStore.generateVariant("Browser user")}>Regenerate from evidence</button>
             </div>
           </div>
         </section>
@@ -271,7 +271,7 @@ function Studio() {
             <div className="channel-index">02 / PAID</div>
             <h3>OpenAI Ads projection</h3>
             <p>The same evidence becomes an Ads-eligible product-feed row and relevant product ad template—not a separate creative fiction.</p>
-            <div className="channel-status"><StatusDot tone={state.adsPackage.status === "ready" ? "good" : "warning"} /><span>{state.adsPackage.status === "ready" ? "Feed ready · Campaign PAUSED" : "Projection not prepared"}</span></div>
+            <div className="channel-status"><StatusDot tone={state.adsPackage.status === "ready" ? "good" : "warning"} /><span>{state.adsPackage.status === "ready" ? "Schema valid locally · Campaign PAUSED" : "Projection not prepared"}</span></div>
           </article>
         </div>
       </section>
@@ -294,7 +294,7 @@ function Storefront() {
           <div className="price-line"><strong>£{state.product.price}</strong><span><StatusDot tone="good" /> In stock · Friday delivery</span></div>
           <p className="store-description">{copy.description}</p>
           <ul>{copy.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>
-          <button className="add-button" onClick={() => appStore.updateCart(state.cartQuantity + 1, "Merchant")}><span>Add to bag</span><span>{state.cartQuantity ? `${state.cartQuantity} in bag` : "£159"}</span></button>
+          <button className="add-button" onClick={() => appStore.updateCart(state.cartQuantity + 1, "Browser user")}><span>Add to bag</span><span>{state.cartQuantity ? `${state.cartQuantity} in bag` : "£159"}</span></button>
           <div className="agent-proof">
             <div><span>Agent-readable product proof</span><strong>{published ? "08 / 08" : `${state.baselineEvaluation.score.toString().padStart(2, "0")} / 08`}</strong></div>
             <p>{published ? "This page exposes verified fit, weather, repair, price and delivery facts through 9 WebMCP site tools." : "The approved evidence-led variant has not been published yet. Agents still see the current generic copy."}</p>

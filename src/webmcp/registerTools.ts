@@ -1,5 +1,6 @@
 import { appStore } from "../store/appStore";
 import { evaluateCopy } from "../domain/evaluation";
+import { evaluateShopperNeed } from "../domain/shopperMatch";
 
 const emptySchema = { type: "object", properties: {}, additionalProperties: false };
 
@@ -23,7 +24,8 @@ interface ToolEffect {
   class: ToolEffectClass;
   changedState: boolean;
   externalWrite: boolean;
-  requiresMerchantApproval: boolean;
+  requiresApprovalState: boolean;
+  approvalAssurance: "not_applicable" | "demo_ui_gesture";
   authority: string;
 }
 
@@ -32,49 +34,56 @@ const effects = {
     class: "read",
     changedState: false,
     externalWrite: false,
-    requiresMerchantApproval: false,
+    requiresApprovalState: false,
+    approvalAssurance: "not_applicable",
     authority: "Agent may inspect verified merchant-controlled state.",
   },
   draft: {
     class: "draft",
     changedState: true,
     externalWrite: false,
-    requiresMerchantApproval: false,
+    requiresApprovalState: false,
+    approvalAssurance: "not_applicable",
     authority: "Agent may change draft state using verified evidence only.",
   },
   evaluation: {
     class: "evaluation",
     changedState: true,
     externalWrite: false,
-    requiresMerchantApproval: false,
+    requiresApprovalState: false,
+    approvalAssurance: "not_applicable",
     authority: "Agent may store deterministic evaluation evidence; this is not observed commercial lift.",
   },
   stage: {
     class: "stage",
     changedState: true,
     externalWrite: false,
-    requiresMerchantApproval: false,
-    authority: "Agent may stage an evaluated draft but cannot approve it.",
+    requiresApprovalState: false,
+    approvalAssurance: "not_applicable",
+    authority: "Agent may stage an evaluated draft; approval state is absent from the site-tool surface.",
   },
   publish: {
     class: "demo_publish",
     changedState: true,
     externalWrite: false,
-    requiresMerchantApproval: true,
-    authority: "Requires the exact merchant-approved digest; changes only the demo storefront.",
+    requiresApprovalState: true,
+    approvalAssurance: "demo_ui_gesture",
+    authority: "Requires exact digest-bound demo approval state. The credential-free demo does not authenticate the browser actor.",
   },
   paid: {
     class: "paid_projection",
     changedState: true,
     externalWrite: false,
-    requiresMerchantApproval: true,
-    authority: "Requires approved published copy; creates a PAUSED projection with no API call or spend.",
+    requiresApprovalState: true,
+    approvalAssurance: "demo_ui_gesture",
+    authority: "Requires digest-approved published copy; creates a PAUSED projection with no API call or spend.",
   },
   cart: {
     class: "demo_cart",
     changedState: true,
     externalWrite: false,
-    requiresMerchantApproval: false,
+    requiresApprovalState: false,
+    approvalAssurance: "not_applicable",
     authority: "Agent may set visible demo cart quantity; checkout and payment are unavailable.",
   },
 } as const satisfies Record<string, ToolEffect>;
@@ -85,7 +94,7 @@ function snapshot() {
     product: { id: state.product.id, sku: state.product.sku, price: state.product.price, inventory: state.product.inventory },
     variant: { id: state.variant.id, status: state.variant.status, approvedDigest: state.variant.approvedDigest },
     evaluation: state.variantEvaluation ? { score: state.variantEvaluation.score, total: state.variantEvaluation.total } : null,
-    ads: { status: state.adsPackage.status, campaignStatus: state.adsPackage.campaignStatus },
+    ads: { status: state.adsPackage.status, campaignStatus: state.adsPackage.campaignStatus, validation: state.adsPackage.validation },
     cartQuantity: state.cartQuantity,
   };
 }
@@ -194,20 +203,20 @@ export async function registerWebMCPTools(): Promise<boolean> {
       annotations: stateChangeAnnotations,
       execute: noInput(async () => success(effects.evaluation, {
         evaluation: appStore.runEvaluation("Agent"),
-      }, "If the result is acceptable, stage the evaluated draft for merchant review.")),
+      }, "If the result is acceptable, stage the evaluated draft at the visible review checkpoint.")),
     },
     {
-      name: "stage_variant_for_merchant_review",
-      description: "Stage the evaluated draft for visible human merchant review. Changes review state only; cannot approve or publish the variant.",
+      name: "stage_variant_for_review",
+      description: "Stage the evaluated draft at the visible browser review checkpoint. Changes review state only; this site tool cannot approve or publish the variant.",
       inputSchema: emptySchema,
       annotations: stateChangeAnnotations,
       execute: noInput(async () => success(effects.stage, {
         variant: appStore.stageVariant("Agent"),
-      }, "Stop. The merchant must select Approve exact variant in the visible interface; no approval tool exists.")),
+      }, "Stop. Approval is absent from the site-tool surface. A browser user may review and select Approve exact variant; this demo does not authenticate that actor.")),
     },
     {
-      name: "publish_merchant_approved_variant",
-      description: "Publish only the exact digest-bound variant already approved by the merchant to the visible demo storefront. Fails with a recovery instruction when approval is absent or stale; no live Shopify write occurs.",
+      name: "publish_approved_variant",
+      description: "Publish only the exact variant with current digest-bound demo approval state to the visible storefront. The approval is a credential-free UI gesture, not authenticated merchant authority; no live Shopify write occurs.",
       inputSchema: emptySchema,
       annotations: stateChangeAnnotations,
       execute: noInput(async () => success(effects.publish, {
@@ -238,22 +247,22 @@ export async function registerWebMCPTools(): Promise<boolean> {
       },
       annotations: readOnlyAnnotations,
       execute: async (input: Record<string, unknown>) => {
-        const query = shopperQuery(input).toLowerCase();
+        const query = shopperQuery(input);
         const state = appStore.getState();
         const visibleCopy = state.variant.status === "published" ? state.variant : state.product.baseline;
         const representedEvidence = new Set(
           evaluateCopy(visibleCopy, state.evidence, "Current visible representation").results
-            .filter((result) => result.matched && result.evidenceId)
-            .map((result) => result.evidenceId),
+            .flatMap((result) => result.matched && result.evidenceId ? [result.evidenceId] : []),
         );
-        const matches = state.evidence.filter((item) => representedEvidence.has(item.id) && item.verified && (item.tags.some((tag) => query.includes(tag)) || item.value.toLowerCase().split(/\s+/).some((term) => term.length > 3 && query.includes(term))));
+        const result = evaluateShopperNeed(query, state.product, state.evidence, representedEvidence);
         return success(effects.read, {
           product: state.product.id,
-          match: matches.length > 0,
-          evidence: matches.map(({ id, label, value, source }) => ({ id, label, value, source })),
+          match: result.match,
+          constraints: result.constraints,
+          evidence: result.evidence,
           price: `${state.product.currency} ${state.product.price}`,
-          note: matches.length ? "Match is based on verified evidence represented in the current published copy." : "No verified evidence represented in the current visible copy directly matched this need.",
-        }, matches.length ? "Set the desired demo cart quantity if the shopper chooses this product." : "Explain the evidence gap; do not recommend unsupported fit.");
+          note: result.match ? "Every material constraint is supported by verified evidence represented in the current published copy." : "At least one material constraint is contradicted or unknown; overall fit is not established.",
+        }, result.match ? "Set the desired demo cart quantity if the shopper chooses this product." : "Explain each contradicted or unknown constraint; do not recommend or update the cart as though fit were established.");
       },
     },
     {

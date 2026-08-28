@@ -60,9 +60,9 @@ The MVP must demonstrate a coherent product experience, not a collection of inte
 - One evidence-led Shopify-style product workspace and shopper view.
 - Nine page-scoped WebMCP tools sharing visible browser state.
 - Deterministic 0/8 → 8/8 buyer-intent evaluation.
-- Exact digest-bound merchant approval before publication.
-- OpenAI Ads-compatible product-feed and PAUSED campaign projection.
-- Merchant-only reset and visible activity trail.
+- Exact digest-bound visible demo approval state before publication, explicitly labeled as unauthenticated.
+- Locally schema-validated OpenAI Ads feed row and PAUSED campaign projection with external acceptance limits disclosed.
+- Approval and reset absent from the WebMCP site-tool surface, plus a visible activity trail.
 - Unit, contract, adversarial, change-impact, coverage, build, and browser smoke gates.
 - Branch-based pull-request workflow with a complete merge gate.
 
@@ -82,8 +82,8 @@ Deliverables:
 Acceptance evidence:
 
 - All tools are discovered with correct descriptions and narrow schemas.
-- An agent can inspect evidence, create and test a variant, stage it, stop for merchant approval, publish the exact approved variant, recommend it to a shopper, and update the same visible cart.
-- Agent attempts to approve, reset, activate Ads, checkout, or pay remain unavailable or blocked.
+- An agent can inspect evidence, create and test a variant, stage it, stop at the visible approval checkpoint, publish the exact digest-approved variant, recommend it to a shopper, and update the same visible cart.
+- Approval and reset remain unavailable as WebMCP site tools. The credential-free demo does not claim to block ordinary browser automation; authenticated merchant grants are required before production Shopify or paid effects.
 - `make test-all` and the native in-app-browser journey both pass from a clean reset.
 
 ### H1.2 — Integration spine and Shopify proof
@@ -153,10 +153,10 @@ Submission story:
 
 1. A commercially suitable product is invisible to agents because its generic copy hides verified fit.
 2. The agent reads merchant-controlled evidence and tests the current listing.
-3. It creates and evaluates a better representation but cannot approve it.
-4. The merchant approves the exact change.
+3. It creates and evaluates a better representation, while the WebMCP tool surface exposes no approval action.
+4. A browser user reviews and records exact demo approval; production publication requires an authenticated merchant grant.
 5. The agent publishes the approved truth, prepares a PAUSED paid projection, recommends the product, and updates the visible shopper cart.
-6. The merchant sees every action and retains authority throughout.
+6. The browser user sees every action; the demo distinguishes visible review state from production merchant authority.
 
 ### Stage 1 cut line
 
@@ -164,7 +164,7 @@ Must ship before any stretch work:
 
 - Public URL and clean-session reliability.
 - Native WebMCP discovery and shared-state journey.
-- Exact merchant approval boundary.
+- Honest digest-bound demo approval state, with authenticated merchant authority reserved for the real adapter boundary.
 - Faithful Shopify and Ads adapter contracts with credential-free fallback.
 - Submission copy, repository instructions, license visibility, and video.
 

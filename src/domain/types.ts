@@ -57,16 +57,62 @@ export interface Evaluation {
 
 export interface Activity {
   id: string;
-  actor: "Merchant" | "Agent" | "System";
+  actor: "Browser user" | "Agent" | "System";
   action: string;
   detail: string;
   time: string;
 }
 
+export type ConstraintStatus = "supported" | "contradicted" | "unknown";
+
+export interface ConstraintEvidence {
+  id: string;
+  label: string;
+  value: string;
+  source: string;
+}
+
+export interface ShopperConstraint {
+  id: string;
+  requirement: string;
+  status: ConstraintStatus;
+  evidence: ConstraintEvidence[];
+  explanation: string;
+}
+
+export interface ShopperMatch {
+  match: boolean;
+  constraints: ShopperConstraint[];
+  evidence: ConstraintEvidence[];
+}
+
+export interface OpenAIProductFeedRow {
+  id: string;
+  title: string;
+  description: string;
+  price: string;
+  availability: "in_stock" | "out_of_stock" | "preorder" | "backorder";
+  link: string;
+  image_link: string;
+  brand: string;
+  identifier_exists: "yes" | "no";
+  gtin?: string;
+  mpn?: string;
+  is_ads_eligible: true;
+}
+
+export interface FeedValidation {
+  scope: "local_schema";
+  valid: boolean;
+  errors: string[];
+  unverified: string[];
+}
+
 export interface AdsPackage {
   status: "not_prepared" | "ready";
   campaignStatus: "not_created" | "PAUSED";
-  feed: Record<string, string | number | boolean> | null;
+  feed: OpenAIProductFeedRow | null;
+  validation: FeedValidation | null;
   adTemplate: { headline: string; description: string } | null;
   disclaimer: string;
 }

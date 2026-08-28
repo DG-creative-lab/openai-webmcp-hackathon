@@ -13,10 +13,10 @@ Conversion Lab makes that gap measurable. It:
 1. Reads verified product, operations and policy evidence.
 2. Generates an evidence-bound product variant.
 3. Runs eight deterministic buyer-intent tasks.
-4. Stages the result for a human merchant.
-5. Hash-binds approval to the exact copy and evidence set.
-6. Publishes only that approved version to the demo storefront.
-7. Produces a compatible OpenAI Ads product-feed and **PAUSED** campaign projection.
+4. Stages the result at a visible browser review checkpoint.
+5. Hash-binds the demo approval state to the exact copy and evidence set.
+6. Publishes only that digest-approved version to the demo storefront.
+7. Produces a locally schema-validated OpenAI Ads product-feed row and **PAUSED** campaign projection.
 
 ## WebMCP site tools
 
@@ -28,8 +28,8 @@ The app registers nine page-scoped tools with `document.modelContext.registerToo
 | `audit_channel_readiness` | Explains organic and paid readiness gaps |
 | `create_evidence_led_variant` | Creates a draft from verified evidence |
 | `run_buyer_intent_battery` | Runs and stores eight deterministic evaluations |
-| `stage_variant_for_merchant_review` | Stages a tested variant; cannot approve it |
-| `publish_merchant_approved_variant` | Publishes only the exact hash-approved variant |
+| `stage_variant_for_review` | Stages a tested variant; cannot approve it through site tools |
+| `publish_approved_variant` | Publishes only the exact hash-approved demo variant |
 | `prepare_openai_ads_package` | Creates a feed row and PAUSED campaign projection |
 | `search_product_by_need` | Matches a shopper need to verified facts |
 | `update_demo_cart` | Updates visible demo cart state; never checks out |
@@ -38,9 +38,9 @@ Every input schema is narrow and rejects additional properties. Read-only tools 
 
 ## Authority model
 
-- Agents may read evidence, draft, evaluate and stage.
-- Only the visible merchant interface can create approval.
-- Approval is bound to an FNV-1a digest of exact copy plus sorted evidence IDs.
+- Site tools may read evidence, draft, evaluate and stage; no approval or reset site tool is registered.
+- The visible browser interface records the demo approval gesture, bound to an FNV-1a digest of exact copy plus sorted evidence IDs.
+- This credential-free demo does not authenticate the browser actor and therefore does not claim enforced human or merchant-only authority. A production Shopify write requires an authenticated merchant grant bound to the same target and digest.
 - Publishing fails if approval is missing or stale.
 - The Ads integration is deliberately a projection: no credential, external API write, activation or spend path exists in this demo.
 - Cart tools cannot initiate checkout or payment.
@@ -74,21 +74,22 @@ Product delivery is organized across hackathon, standalone beta, platform-integr
 1. Select **Reset demo** and confirm to return to the generic 0/8 baseline.
 2. In **Growth studio**, use the exact starter prompt shown in the six-checkpoint judge guide.
 3. Let Codex inspect evidence, create and evaluate the 8/8 draft, and stage it for review.
-4. At the orange human gate, approve the exact variant in the visible merchant UI.
+4. At the orange review checkpoint, inspect and approve the exact variant in the visible UI. This is a transparent demo gesture, not an authenticated identity check.
 5. Tell Codex to continue with the prompt shown by the guide. It publishes the approved demo copy, prepares the PAUSED paid projection, verifies the shopper match and updates the cart.
 6. Switch to **Shopper view** and verify the same approved copy and cart state.
 
-The reset control is deliberately merchant-only and is not exposed as a WebMCP tool. It clears evaluation, approval, channel projections, cart state and prior activity while preserving the verified product evidence and the browser's WebMCP registration.
+The reset control is deliberately absent from the WebMCP site-tool surface. It remains available in the page UI, so ordinary browser automation could still operate it. Reset clears evaluation, approval, channel projections, cart state and prior activity while preserving verified product evidence and the browser's WebMCP registration.
 
 ## Product boundaries
 
 This first slice uses a deterministic, local evidence and evaluation engine so judges can verify the product without Shopify or Ads credentials. The production extension points are clear: Shopify Admin API ingestion/publication, OpenAI Ads campaign management and Delta Feed updates after merchant onboarding, measurement events, and a configurable intent-evaluation library.
 
-The OpenAI Ads projection follows the documented product-feed shape and marks the item Ads-eligible. Initial feed connection and catalogue upload currently happen through Ads Manager and SFTP rather than the public Advertiser API. For eligible accounts with a linked feed, the API can then manage product-feed campaigns and Delta Feed updates. The credential-free demo therefore exports a validated package and PAUSED projection rather than pretending to provision a live feed or activate spend.
+The OpenAI Ads projection includes the documented core file-upload fields, marks the item Ads-eligible, and truthfully sets `identifier_exists` to `no` for this fictional product. An independent local validator checks required fields, identifier rules, URL syntax, price format and supported availability. It cannot prove URL reachability, merchant/feed configuration, or acceptance by OpenAI processing, and the UI reports those limits. Initial feed connection and catalogue upload happen through Ads Manager and SFTP rather than the public Advertiser API; the credential-free demo never pretends to provision a feed or activate spend.
 
 ## References
 
 - [OpenAI WebMCP site tools](https://learn.chatgpt.com/docs/webmcp)
 - [OpenAI Ads API overview](https://developers.openai.com/ads/api-overview)
 - [OpenAI Ads product feeds](https://developers.openai.com/ads/product-feeds)
+- [OpenAI product-feed file specification](https://developers.openai.com/commerce/specs/file-upload/products)
 - [OpenAI WebMCP Challenge](https://openai.com/webmcp-challenge/)

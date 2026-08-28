@@ -40,7 +40,7 @@ describe("WebMCP registration", () => {
   it("registers the complete narrow tool surface", async () => {
     const definitions = await createToolRegistry();
     expect(definitions).toHaveLength(9);
-    expect(definitions.map((item) => item.name)).toContain("publish_merchant_approved_variant");
+    expect(definitions.map((item) => item.name)).toContain("publish_approved_variant");
     expect(definitions.every((item) => item.inputSchema.additionalProperties === false)).toBe(true);
     expect(definitions.filter((item) => item.annotations?.readOnlyHint)).toHaveLength(3);
     expect(definitions.filter((item) => !item.annotations?.readOnlyHint)).toHaveLength(6);
@@ -49,7 +49,7 @@ describe("WebMCP registration", () => {
     expect(definitions.every((item) => item.description.length >= 100)).toBe(true);
   });
 
-  it("executes the complete tool contract while preserving merchant approval", async () => {
+  it("executes the complete tool contract around digest-bound visible approval", async () => {
     const definitions = await createToolRegistry();
     const execute = (name: string, input: Record<string, unknown> = {}) => {
       const tool = definitions.find((candidate) => candidate.name === name);
@@ -75,26 +75,34 @@ describe("WebMCP registration", () => {
       effect: { class: "evaluation" },
       evaluation: { score: 8, total: 8 },
     });
-    await expect(execute("stage_variant_for_merchant_review")).resolves.toMatchObject({
-      effect: { class: "stage", requiresMerchantApproval: false },
-      nextAction: expect.stringMatching(/merchant must select Approve exact variant/i),
+    await expect(execute("stage_variant_for_review")).resolves.toMatchObject({
+      effect: { class: "stage", requiresApprovalState: false, approvalAssurance: "not_applicable" },
+      nextAction: expect.stringMatching(/does not authenticate that actor/i),
     });
-    await expect(execute("publish_merchant_approved_variant")).rejects.toThrow(/approval/i);
+    await expect(execute("publish_approved_variant")).rejects.toThrow(/approval/i);
 
-    appStore.approveVariant();
-    await expect(execute("publish_merchant_approved_variant")).resolves.toMatchObject({
-      effect: { class: "demo_publish", requiresMerchantApproval: true, externalWrite: false },
+    appStore.recordVisibleApproval();
+    await expect(execute("publish_approved_variant")).resolves.toMatchObject({
+      effect: { class: "demo_publish", requiresApprovalState: true, approvalAssurance: "demo_ui_gesture", externalWrite: false },
       surface: "demo Shopify storefront",
       liveExternalWrite: false,
     });
     await expect(execute("prepare_openai_ads_package")).resolves.toMatchObject({
-      effect: { class: "paid_projection", requiresMerchantApproval: true, externalWrite: false },
-      adsPackage: { campaignStatus: "PAUSED" },
+      effect: { class: "paid_projection", requiresApprovalState: true, externalWrite: false },
+      adsPackage: {
+        campaignStatus: "PAUSED",
+        feed: { identifier_exists: "no", is_ads_eligible: true },
+        validation: { scope: "local_schema", valid: true, errors: [] },
+      },
       projectedSpend: "GBP 0",
     });
     await expect(execute("search_product_by_need", { query: "waterproof 16-inch laptop bag" })).resolves.toMatchObject({
       effect: { class: "read" },
       match: true,
+      constraints: [
+        { id: "weather-protection", status: "supported" },
+        { id: "laptop-size", status: "supported" },
+      ],
     });
     await expect(execute("update_demo_cart", { quantity: 2 })).resolves.toMatchObject({
       effect: { class: "demo_cart", externalWrite: false },
