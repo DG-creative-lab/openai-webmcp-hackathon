@@ -92,6 +92,7 @@ export interface OpenAIProductFeedRow {
   description: string;
   price: string;
   availability: "in_stock" | "out_of_stock" | "preorder" | "backorder";
+  availability_date?: string;
   link: string;
   image_link: string;
   brand: string;

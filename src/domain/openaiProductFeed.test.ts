@@ -33,6 +33,27 @@ describe("OpenAI product-feed local schema validator", () => {
     expect(validateOpenAIProductFeedRow({ ...row, gtin: "123456789012" })).toMatchObject({ valid: true, errors: [] });
   });
 
+  it.each(["preorder", "backorder"] as const)("rejects %s without an availability date", (availability) => {
+    expect(validateOpenAIProductFeedRow({ ...validRow, availability })).toMatchObject({
+      valid: false,
+      errors: expect.arrayContaining(["required:availability_date"]),
+    });
+  });
+
+  it.each(["preorder", "backorder"] as const)("accepts %s with a valid ISO availability date", (availability) => {
+    expect(validateOpenAIProductFeedRow({ ...validRow, availability, availability_date: "2099-12-01" })).toMatchObject({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it("rejects a malformed availability date", () => {
+    expect(validateOpenAIProductFeedRow({ ...validRow, availability: "preorder", availability_date: "2099-02-30" })).toMatchObject({
+      valid: false,
+      errors: expect.arrayContaining(["format:availability_date"]),
+    });
+  });
+
   it("rejects conflicting identifier declarations and malformed contract fields", () => {
     expect(validateOpenAIProductFeedRow({
       ...validRow,
