@@ -13,17 +13,54 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
-function isIsoDate(value: string): boolean {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const timestamp = Date.parse(`${value}T00:00:00Z`);
-    return !Number.isNaN(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value;
-  }
-
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return false;
-  return !Number.isNaN(Date.parse(value));
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
 
-export function validateOpenAIProductFeedRow(row: Partial<OpenAIProductFeedRow>): FeedValidation {
+function isCalendarDate(year: number, month: number, day: number): boolean {
+  const daysByMonth = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return month >= 1 && month <= 12 && day >= 1 && day <= daysByMonth[month - 1];
+}
+
+function toUtcTimestamp(year: number, month: number, day: number, hour = 0, minute = 0, second = 0): number {
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(hour, minute, second, 0);
+  return date.getTime();
+}
+
+function parseIsoAvailabilityDate(value: string): number | null {
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (dateOnly) {
+    const [, yearText, monthText, dayText] = dateOnly;
+    const [year, month, day] = [yearText, monthText, dayText].map(Number);
+    return isCalendarDate(year, month, day) ? toUtcTimestamp(year, month, day) : null;
+  }
+
+  const dateTime = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|([+-])(\d{2}):(\d{2}))$/.exec(value);
+  if (!dateTime) return null;
+
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText = "0", fractionText = "", , offsetSign, offsetHourText = "0", offsetMinuteText = "0"] = dateTime;
+  const [year, month, day, hour, minute, second, offsetHour, offsetMinute] = [
+    yearText,
+    monthText,
+    dayText,
+    hourText,
+    minuteText,
+    secondText,
+    offsetHourText,
+    offsetMinuteText,
+  ].map(Number);
+  if (!isCalendarDate(year, month, day) || hour > 23 || minute > 59 || second > 59) return null;
+  if (offsetHour > 14 || offsetMinute > 59 || (offsetHour === 14 && offsetMinute !== 0)) return null;
+
+  const fractionMilliseconds = fractionText ? Number(`0.${fractionText}`) * 1_000 : 0;
+  const offsetDirection = offsetSign === "+" ? 1 : offsetSign === "-" ? -1 : 0;
+  const offsetMilliseconds = offsetDirection * (offsetHour * 60 + offsetMinute) * 60_000;
+  return toUtcTimestamp(year, month, day, hour, minute, second) + fractionMilliseconds - offsetMilliseconds;
+}
+
+export function validateOpenAIProductFeedRow(row: Partial<OpenAIProductFeedRow>, now: Date = new Date()): FeedValidation {
   const errors: string[] = [];
 
   requiredTextFields.forEach((field) => {
@@ -34,8 +71,10 @@ export function validateOpenAIProductFeedRow(row: Partial<OpenAIProductFeedRow>)
   const availabilityDate = typeof row.availability_date === "string" ? row.availability_date.trim() : "";
   if (typeof row.availability === "string" && availabilityRequiringDate.has(row.availability) && availabilityDate.length === 0) {
     errors.push("required:availability_date");
-  } else if (row.availability_date !== undefined && (availabilityDate.length === 0 || !isIsoDate(availabilityDate))) {
-    errors.push("format:availability_date");
+  } else if (row.availability_date !== undefined) {
+    const availabilityTimestamp = availabilityDate.length > 0 ? parseIsoAvailabilityDate(availabilityDate) : null;
+    if (availabilityTimestamp === null) errors.push("format:availability_date");
+    else if (availabilityTimestamp <= now.getTime()) errors.push("value:availability_date_future");
   }
   if (typeof row.link !== "string" || !isHttpUrl(row.link)) errors.push("format:link");
   if (typeof row.image_link !== "string" || !isHttpUrl(row.image_link)) errors.push("format:image_link");

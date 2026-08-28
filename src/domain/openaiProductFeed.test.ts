@@ -14,6 +14,7 @@ const validRow: OpenAIProductFeedRow = {
   identifier_exists: "no",
   is_ads_eligible: true,
 };
+const validationNow = new Date("2026-08-28T12:00:00.000Z");
 
 describe("OpenAI product-feed local schema validator", () => {
   it("accepts a complete row that truthfully declares no product identifier", () => {
@@ -41,17 +42,46 @@ describe("OpenAI product-feed local schema validator", () => {
   });
 
   it.each(["preorder", "backorder"] as const)("accepts %s with a valid ISO availability date", (availability) => {
-    expect(validateOpenAIProductFeedRow({ ...validRow, availability, availability_date: "2099-12-01" })).toMatchObject({
+    expect(validateOpenAIProductFeedRow({ ...validRow, availability, availability_date: "2026-08-29" }, validationNow)).toMatchObject({
       valid: true,
       errors: [],
     });
   });
 
   it("rejects a malformed availability date", () => {
-    expect(validateOpenAIProductFeedRow({ ...validRow, availability: "preorder", availability_date: "2099-02-30" })).toMatchObject({
+    expect(validateOpenAIProductFeedRow({ ...validRow, availability: "preorder", availability_date: "2099-02-30" }, validationNow)).toMatchObject({
       valid: false,
       errors: expect.arrayContaining(["format:availability_date"]),
     });
+  });
+
+  it.each(["preorder", "backorder"] as const)("rejects a past date for %s", (availability) => {
+    expect(validateOpenAIProductFeedRow({ ...validRow, availability, availability_date: "2020-01-01" }, validationNow)).toMatchObject({
+      valid: false,
+      errors: expect.arrayContaining(["value:availability_date_future"]),
+    });
+  });
+
+  it.each(["preorder", "backorder"] as const)("rejects an impossible timestamp for %s", (availability) => {
+    expect(validateOpenAIProductFeedRow({ ...validRow, availability, availability_date: "2099-02-30T00:00Z" }, validationNow)).toMatchObject({
+      valid: false,
+      errors: expect.arrayContaining(["format:availability_date"]),
+    });
+  });
+
+  it.each(["2026-08-28", "2026-08-28T12:00:00.000Z"])("rejects the non-future boundary %s", (availabilityDate) => {
+    expect(validateOpenAIProductFeedRow({ ...validRow, availability: "preorder", availability_date: availabilityDate }, validationNow)).toMatchObject({
+      valid: false,
+      errors: expect.arrayContaining(["value:availability_date_future"]),
+    });
+  });
+
+  it("accepts a strictly valid future timestamp with an explicit UTC offset", () => {
+    expect(validateOpenAIProductFeedRow({
+      ...validRow,
+      availability: "backorder",
+      availability_date: "2026-08-29T00:00:00.001+01:00",
+    }, validationNow)).toMatchObject({ valid: true, errors: [] });
   });
 
   it("rejects conflicting identifier declarations and malformed contract fields", () => {
