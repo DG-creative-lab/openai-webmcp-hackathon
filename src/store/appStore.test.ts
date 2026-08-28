@@ -78,4 +78,18 @@ describe("merchant authority boundary", () => {
 
     expect(semanticSnapshot(second)).toEqual(semanticSnapshot(first));
   });
+
+  it("notifies active subscribers and stops after unsubscribe", () => {
+    let notifications = 0;
+    const unsubscribe = appStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    appStore.setSurface("storefront");
+    expect(notifications).toBe(1);
+
+    unsubscribe();
+    appStore.setSurface("studio");
+    expect(notifications).toBe(1);
+  });
 });

@@ -61,6 +61,12 @@ pnpm test
 pnpm build
 ```
 
+## Quality workflow
+
+Create work on `feature/<short-name>` or `fix/<short-name>` branches. Use `make test-affected BASE_REF=origin/main` while iterating and `make test-all` before opening a pull request. Pull requests to `main` run the complete deterministic gate; branch pushes receive change-aware feedback.
+
+The suite includes unit/contract coverage, bounded adversarial lifecycle and authority tests, and a Playwright agent-assisted browser journey. See [docs/TESTING.md](docs/TESTING.md) for the test map, CI policy, coverage scope and repo-local `$webmcp-quality-harness` skill.
+
 ## Demo flow
 
 1. Select **Reset demo** and confirm to start from the verified baseline.

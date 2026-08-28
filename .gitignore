@@ -1,7 +1,9 @@
-node_modules
-dist
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
 .DS_Store
 *.local
-coverage
-*.tsbuildinfo
 .playwright-mcp
