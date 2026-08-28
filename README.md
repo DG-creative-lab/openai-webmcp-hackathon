@@ -67,6 +67,8 @@ Create work on `feature/<short-name>` or `fix/<short-name>` branches. Use `make 
 
 The suite includes unit/contract coverage, bounded adversarial lifecycle and authority tests, and a Playwright agent-assisted browser journey. See [docs/TESTING.md](docs/TESTING.md) for the test map, CI policy, coverage scope and repo-local `$webmcp-quality-harness` skill.
 
+Product delivery is organized across hackathon, standalone beta, platform-integration, and learning-growth stages in [docs/PRODUCT-ROADMAP.md](docs/PRODUCT-ROADMAP.md). The repo-local `$conversion-lab-product-steward` skill helps future Codex sessions select milestones, preserve cut lines, and validate material external changes before proposing roadmap shifts.
+
 ## Demo flow
 
 1. Select **Reset demo** and confirm to start from the verified baseline.
@@ -82,9 +84,9 @@ The reset control is deliberately merchant-only and is not exposed as a WebMCP t
 
 ## Product boundaries
 
-This first slice uses a deterministic, local evidence and evaluation engine so judges can verify the product without Shopify or Ads credentials. The production extension points are clear: Shopify Admin API ingestion/publication, OpenAI Ads initial product-feed onboarding plus Delta Feeds, measurement events, and a configurable intent-evaluation library.
+This first slice uses a deterministic, local evidence and evaluation engine so judges can verify the product without Shopify or Ads credentials. The production extension points are clear: Shopify Admin API ingestion/publication, OpenAI Ads campaign management and Delta Feed updates after merchant onboarding, measurement events, and a configurable intent-evaluation library.
 
-The OpenAI Ads projection follows the documented product-feed shape and marks the item Ads-eligible. OpenAI currently requires the initial product catalogue connection outside the public API; the demo therefore exports a package rather than pretending to provision a live account.
+The OpenAI Ads projection follows the documented product-feed shape and marks the item Ads-eligible. Initial feed connection and catalogue upload currently happen through Ads Manager and SFTP rather than the public Advertiser API. For eligible accounts with a linked feed, the API can then manage product-feed campaigns and Delta Feed updates. The credential-free demo therefore exports a validated package and PAUSED projection rather than pretending to provision a live feed or activate spend.
 
 ## References
 
