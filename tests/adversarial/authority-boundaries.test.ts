@@ -5,6 +5,7 @@ import { registerWebMCPTools } from "../../src/webmcp/registerTools";
 type Checkpoint = "draft" | "evaluated" | "staged" | "approved" | "published";
 type ToolDefinition = {
   name: string;
+  description?: string;
   annotations?: { readOnlyHint?: boolean };
   execute: (input: Record<string, unknown>) => Promise<unknown>;
 };
@@ -17,7 +18,7 @@ function reach(checkpoint: Checkpoint) {
   if (checkpoint === "evaluated") return;
   appStore.stageVariant("Agent");
   if (checkpoint === "staged") return;
-  appStore.approveVariant();
+  appStore.recordVisibleApproval();
   if (checkpoint === "approved") return;
   appStore.publishVariant("Agent");
 }
@@ -48,14 +49,14 @@ describe("adversarial authority and lifecycle boundaries", () => {
     ["draft", "stage", /evaluated draft/i],
     ["draft", "approve", /staged/i],
     ["draft", "publish", /approval/i],
-    ["draft", "ads", /merchant-approved/i],
+    ["draft", "ads", /digest-approved/i],
     ["evaluated", "approve", /staged/i],
     ["evaluated", "publish", /approval/i],
     ["staged", "stage", /evaluated draft/i],
     ["staged", "publish", /approval/i],
-    ["staged", "ads", /merchant-approved/i],
+    ["staged", "ads", /digest-approved/i],
     ["approved", "stage", /evaluated draft/i],
-    ["approved", "ads", /merchant-approved/i],
+    ["approved", "ads", /digest-approved/i],
     ["published", "stage", /evaluated draft/i],
     ["published", "approve", /staged/i],
   ] as const)("blocks %s → %s as an illegal transition", (checkpoint, action, message) => {
@@ -63,7 +64,7 @@ describe("adversarial authority and lifecycle boundaries", () => {
     const before = appStore.getState().variant.status;
     const attempt = () => {
       if (action === "stage") appStore.stageVariant("Agent");
-      if (action === "approve") appStore.approveVariant();
+      if (action === "approve") appStore.recordVisibleApproval();
       if (action === "publish") appStore.publishVariant("Agent");
       if (action === "ads") appStore.prepareAds("Agent");
     };
@@ -81,6 +82,21 @@ describe("adversarial authority and lifecycle boundaries", () => {
     expect(approvedDigest).toMatch(/^fnv1a-/);
     expect(appStore.getState().variant.approvedDigest).toBeNull();
     expect(() => appStore.publishVariant("Agent")).toThrow(/approval/i);
+  });
+
+  it("invalidates a stale paid projection when a new draft is generated", () => {
+    reach("published");
+    appStore.prepareAds("Agent");
+    expect(appStore.getState().adsPackage.status).toBe("ready");
+
+    appStore.generateVariant("Agent");
+
+    expect(appStore.getState().variant.status).toBe("draft");
+    expect(appStore.getState().adsPackage).toMatchObject({
+      status: "not_prepared",
+      campaignStatus: "not_created",
+      feed: null,
+    });
   });
 
   it("does not expose mutable authoritative state to a caller", () => {
@@ -104,13 +120,14 @@ describe("adversarial authority and lifecycle boundaries", () => {
     expect(appStore.getState().cartQuantity).toBe(expected);
   });
 
-  it("keeps approval and reset outside the agent tool surface", async () => {
+  it("keeps approval and reset outside the site-tool surface without claiming browser authority", async () => {
     const tools = await registeredTools();
     const names = tools.map((tool) => tool.name);
 
     expect(names).toHaveLength(9);
     expect(names).not.toContain("approve_variant");
     expect(names.some((name) => name.startsWith("approve_") || name.startsWith("reset_"))).toBe(false);
+    expect(tools.find((tool) => tool.name === "publish_approved_variant")?.description).toMatch(/does not authenticate|not authenticated/i);
     expect(tools.find((tool) => tool.name === "get_growth_workspace")?.annotations?.readOnlyHint).toBe(true);
     expect(tools.find((tool) => tool.name === "audit_channel_readiness")?.annotations?.readOnlyHint).toBe(true);
     expect(tools.find((tool) => tool.name === "search_product_by_need")?.annotations?.readOnlyHint).toBe(true);
@@ -127,7 +144,63 @@ describe("adversarial authority and lifecycle boundaries", () => {
 
     expect(result.match).toBe(false);
     expect(result.evidence).toEqual([]);
-    expect(result.note).toMatch(/No verified evidence/i);
+    expect(result.note).toMatch(/contradicted or unknown/i);
+  });
+
+  it("records accurate provenance for the unauthenticated browser approval gesture", () => {
+    reach("staged");
+    appStore.recordVisibleApproval();
+
+    expect(appStore.getState().activities[0]).toMatchObject({
+      actor: "Browser user",
+      action: "Visible approval recorded",
+      detail: expect.stringMatching(/does not authenticate the actor/i),
+    });
+  });
+
+  it.each([
+    ["waterproof bag for a 17-inch laptop", ["supported", "contradicted"]],
+    ["waterproof bag under £150", ["supported", "contradicted"]],
+    ["not waterproof", ["contradicted"]],
+    ["waterproof 16-inch laptop with solar charging", ["supported", "supported", "unknown"]],
+  ])("does not recommend when one material constraint in %s is unmet", async (query, statuses) => {
+    reach("published");
+    const tools = await registeredTools();
+    const search = tools.find((tool) => tool.name === "search_product_by_need");
+    const result = await search?.execute({ query }) as {
+      match: boolean;
+      constraints: Array<{ status: string }>;
+      nextAction: string;
+    };
+
+    expect(result.match).toBe(false);
+    expect(result.constraints.map((constraint) => constraint.status)).toEqual(statuses);
+    expect(result.nextAction).toMatch(/do not recommend or update the cart/i);
+  });
+
+  it("does not expose verified but hidden facts as shopper matches before publication", async () => {
+    const tools = await registeredTools();
+    const search = tools.find((tool) => tool.name === "search_product_by_need");
+    const before = await search?.execute({ query: "waterproof bag for a 16-inch laptop" }) as {
+      match: boolean;
+      evidence: unknown[];
+      note: string;
+      constraints: Array<{ status: string; explanation: string }>;
+    };
+
+    expect(before).toMatchObject({ match: false, evidence: [] });
+    expect(before.constraints).toEqual([
+      expect.objectContaining({ status: "unknown", explanation: expect.stringMatching(/current visible copy/i) }),
+      expect.objectContaining({ status: "unknown", explanation: expect.stringMatching(/current visible copy/i) }),
+    ]);
+
+    reach("published");
+    const after = await search?.execute({ query: "waterproof bag for a 16-inch laptop" }) as {
+      match: boolean;
+      evidence: unknown[];
+    };
+    expect(after.match).toBe(true);
+    expect(after.evidence).toHaveLength(2);
   });
 
   it("prepares only a PAUSED, zero-spend projection after exact publication", () => {
@@ -137,6 +210,7 @@ describe("adversarial authority and lifecycle boundaries", () => {
     expect(ads.status).toBe("ready");
     expect(ads.campaignStatus).toBe("PAUSED");
     expect(ads.disclaimer).toMatch(/No Ads API call|No.*spend/i);
-    expect(ads.feed).toMatchObject({ is_ads_eligible: true });
+    expect(ads.feed).toMatchObject({ identifier_exists: "no", is_ads_eligible: true });
+    expect(ads.validation).toMatchObject({ scope: "local_schema", valid: true, errors: [] });
   });
 });

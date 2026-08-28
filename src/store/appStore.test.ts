@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { appStore } from "./appStore";
 
-describe("merchant authority boundary", () => {
+describe("demo lifecycle boundary", () => {
   beforeEach(() => appStore.reset());
 
-  it("blocks publication before exact merchant approval", () => {
+  it("starts from the generic baseline and requires a draft before evaluation", () => {
+    expect(appStore.getState().variant).toMatchObject({
+      title: "Modular Commuter Pack",
+      status: "baseline",
+    });
+    expect(() => appStore.runEvaluation("Agent")).toThrow(/create an evidence-led draft/i);
+  });
+
+  it("blocks publication before exact digest-bound approval state", () => {
     expect(() => appStore.publishVariant("Agent")).toThrow(/approval/i);
   });
 
@@ -12,7 +20,7 @@ describe("merchant authority boundary", () => {
     appStore.generateVariant("Agent");
     expect(appStore.runEvaluation("Agent").score).toBe(8);
     expect(appStore.stageVariant("Agent").status).toBe("staged");
-    expect(appStore.approveVariant().approvedDigest).toMatch(/^fnv1a-/);
+    expect(appStore.recordVisibleApproval().approvedDigest).toMatch(/^fnv1a-/);
     expect(appStore.publishVariant("Agent").status).toBe("published");
   });
 
@@ -21,19 +29,22 @@ describe("merchant authority boundary", () => {
     appStore.generateVariant("Agent");
     appStore.runEvaluation("Agent");
     appStore.stageVariant("Agent");
-    appStore.approveVariant();
+    appStore.recordVisibleApproval();
     appStore.publishVariant("Agent");
     const packageResult = appStore.prepareAds("Agent");
     expect(packageResult.campaignStatus).toBe("PAUSED");
     expect(packageResult.disclaimer).toMatch(/No Ads API call/);
+    expect(packageResult.feed).toMatchObject({ identifier_exists: "no", is_ads_eligible: true });
+    expect(packageResult.validation).toMatchObject({ scope: "local_schema", valid: true, errors: [] });
+    expect(packageResult.validation?.unverified).toContain("The row is accepted during OpenAI feed processing");
   });
 
-  it("resets every mutable workflow surface to the canonical merchant baseline", () => {
+  it("resets every mutable workflow surface to the canonical demo baseline", () => {
     appStore.setWebmcpAvailable(true);
     appStore.generateVariant("Agent");
     appStore.runEvaluation("Agent");
     appStore.stageVariant("Agent");
-    appStore.approveVariant();
+    appStore.recordVisibleApproval();
     appStore.publishVariant("Agent");
     appStore.prepareAds("Agent");
     appStore.updateCart(3, "Agent");
@@ -43,8 +54,8 @@ describe("merchant authority boundary", () => {
 
     expect(resetState.surface).toBe("studio");
     expect(resetState.variant).toMatchObject({
-      title: "24L Waterproof Commuter Backpack + Pannier",
-      status: "draft",
+      title: "Modular Commuter Pack",
+      status: "baseline",
       approvedDigest: null,
       approvedAt: null,
       publishedAt: null,
@@ -54,17 +65,18 @@ describe("merchant authority boundary", () => {
       status: "not_prepared",
       campaignStatus: "not_created",
       feed: null,
+      validation: null,
       adTemplate: null,
     });
     expect(resetState.cartQuantity).toBe(0);
     expect(resetState.webmcpAvailable).toBe(true);
     expect(resetState.activities).toHaveLength(1);
-    expect(resetState.activities[0]).toMatchObject({ actor: "Merchant", action: "Demo reset" });
+    expect(resetState.activities[0]).toMatchObject({ actor: "Browser user", action: "Demo reset" });
     expect(() => appStore.publishVariant("Agent")).toThrow(/approval/i);
     expect(() => appStore.prepareAds("Agent")).toThrow(/approved variant/i);
   });
 
-  it("is semantically idempotent when the merchant resets repeatedly", () => {
+  it("is semantically idempotent when the browser user resets repeatedly", () => {
     const first = appStore.reset();
     const second = appStore.reset();
     const semanticSnapshot = (current: typeof first) => ({

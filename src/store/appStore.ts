@@ -1,5 +1,6 @@
 import { digestVariant, evaluateCopy } from "../domain/evaluation";
-import type { Activity, AppState, ProductCopy, Surface } from "../domain/types";
+import { validateOpenAIProductFeedRow } from "../domain/openaiProductFeed";
+import type { Activity, AppState, OpenAIProductFeedRow, ProductCopy, Surface } from "../domain/types";
 
 const evidence = [
   { id: "ev-waterproof", label: "Weather protection", value: "IPX6 waterproof", source: "Independent spray test · LAB-117", verified: true, tags: ["waterproof", "rain"] },
@@ -43,9 +44,9 @@ const baselineEvaluation = evaluateCopy(product.baseline, evidence, "Current Sho
 function initialVariant(): AppState["variant"] {
   return {
     id: "variant-urban-24-v1",
-    ...variantCopy,
-    bullets: [...variantCopy.bullets],
-    status: "draft",
+    ...product.baseline,
+    bullets: [...product.baseline.bullets],
+    status: "baseline",
     evidenceIds: evidence.map((item) => item.id),
     approvedDigest: null,
     approvedAt: null,
@@ -58,6 +59,7 @@ function initialAdsPackage(): AppState["adsPackage"] {
     status: "not_prepared",
     campaignStatus: "not_created",
     feed: null,
+    validation: null,
     adTemplate: null,
     disclaimer: "Demo projection only. No Ads API call, campaign activation or spend can occur.",
   };
@@ -83,7 +85,7 @@ function activity(actor: Activity["actor"], action: string, detail: string): Act
   };
 }
 
-function initialState(webmcpAvailable: boolean, resetByMerchant = false): AppState {
+function initialState(webmcpAvailable: boolean, resetByBrowserUser = false): AppState {
   return {
     surface: "studio",
     product,
@@ -95,8 +97,8 @@ function initialState(webmcpAvailable: boolean, resetByMerchant = false): AppSta
     cartQuantity: 0,
     webmcpAvailable,
     activities: [
-      resetByMerchant
-        ? activity("Merchant", "Demo reset", "Cleared evaluation, approval, channel projections and cart state. Returned to the verified baseline.")
+      resetByBrowserUser
+        ? activity("Browser user", "Demo reset", "Cleared evaluation, approval, channel projections and cart state. Returned to the verified baseline.")
         : activity("System", "Evidence synced", "8 verified Shopify and operations facts are ready for agent use."),
     ],
   };
@@ -138,10 +140,14 @@ export const appStore = {
         publishedAt: null,
       },
       variantEvaluation: null,
+      adsPackage: initialAdsPackage(),
       activities: addActivity(current, actor, "Variant generated", "Rewrote the product around eight verified buyer-relevant facts."),
     })).variant;
   },
   runEvaluation(actor: Activity["actor"] = "Agent") {
+    if (state.variant.status !== "draft") {
+      throw new Error("Evaluation blocked: create an evidence-led draft first.");
+    }
     const evaluation = evaluateCopy(state.variant, state.evidence, "Evidence-led variant");
     update((current) => ({
       ...current,
@@ -152,27 +158,27 @@ export const appStore = {
   },
   stageVariant(actor: Activity["actor"] = "Agent") {
     if (state.variant.status !== "draft" || !state.variantEvaluation) {
-      throw new Error("Only an evaluated draft can be staged for merchant review.");
+      throw new Error("Only an evaluated draft can be staged for visible review.");
     }
     return update((current) => ({
       ...current,
       variant: { ...current.variant, status: "staged", approvedDigest: null, approvedAt: null },
-      activities: addActivity(current, actor, "Variant staged", "The tested variant is ready for merchant review; no live channel changed."),
+      activities: addActivity(current, actor, "Variant staged", "The tested variant is ready at the visible review checkpoint; no live channel changed."),
     })).variant;
   },
-  approveVariant() {
+  recordVisibleApproval() {
     if (state.variant.status !== "staged") throw new Error("Only a staged variant can be approved.");
     const approvedDigest = digestVariant(state.variant, state.variant.evidenceIds);
     return update((current) => ({
       ...current,
       variant: { ...current.variant, status: "approved", approvedDigest, approvedAt: new Date().toISOString() },
-      activities: addActivity(current, "Merchant", "Variant approved", `Human approval bound to ${approvedDigest}.`),
+      activities: addActivity(current, "Browser user", "Visible approval recorded", `Browser UI gesture bound to ${approvedDigest}; this credential-free demo does not authenticate the actor.`),
     })).variant;
   },
   publishVariant(actor: Activity["actor"] = "Agent") {
     const currentDigest = digestVariant(state.variant, state.variant.evidenceIds);
     if (state.variant.status !== "approved" || state.variant.approvedDigest !== currentDigest) {
-      throw new Error("Publication blocked: this exact variant does not have current merchant approval.");
+      throw new Error("Publication blocked: this exact variant does not have current digest-bound approval state.");
     }
     return update((current) => ({
       ...current,
@@ -183,10 +189,10 @@ export const appStore = {
   prepareAds(actor: Activity["actor"] = "Agent") {
     const currentDigest = digestVariant(state.variant, state.variant.evidenceIds);
     if (state.variant.status !== "published" || state.variant.approvedDigest !== currentDigest) {
-      throw new Error("Ads preparation blocked: publish the exact merchant-approved variant first.");
+      throw new Error("Ads preparation blocked: publish the exact digest-approved variant first.");
     }
     const copy = state.variant;
-    const feed = {
+    const feed: OpenAIProductFeedRow = {
       id: state.product.sku,
       title: copy.title,
       description: copy.description,
@@ -195,8 +201,11 @@ export const appStore = {
       link: `https://demo.invalid/products/${state.product.handle}`,
       image_link: "https://demo.invalid/commuter-pack.png",
       brand: state.product.brand,
+      identifier_exists: "no",
       is_ads_eligible: true,
     };
+    const validation = validateOpenAIProductFeedRow(feed);
+    if (!validation.valid) throw new Error(`Ads preparation blocked: local feed schema failed (${validation.errors.join(", ")}).`);
     return update((current) => ({
       ...current,
       adsPackage: {
@@ -204,9 +213,10 @@ export const appStore = {
         status: "ready",
         campaignStatus: "PAUSED",
         feed,
+        validation,
         adTemplate: { headline: copy.title, description: copy.description },
       },
-      activities: addActivity(current, actor, "Ads package prepared", "Created an Ads-eligible product-feed row and PAUSED campaign projection. £0 spend."),
+      activities: addActivity(current, actor, "Ads package prepared", "Created a locally schema-valid Ads product-feed row and PAUSED campaign projection. URL reachability and OpenAI acceptance remain unverified; £0 spend."),
     })).adsPackage;
   },
   updateCart(quantity: number, actor: Activity["actor"] = "Agent") {

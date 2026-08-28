@@ -10,7 +10,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary", "html"],
       reportsDirectory: "coverage",
-      include: ["src/domain/evaluation.ts", "src/store/appStore.ts", "src/webmcp/registerTools.ts"],
+      include: ["src/domain/evaluation.ts", "src/domain/openaiProductFeed.ts", "src/domain/shopperMatch.ts", "src/store/appStore.ts", "src/webmcp/registerTools.ts"],
       exclude: ["**/*.test.ts", "**/*.d.ts"],
       thresholds: {
         statements: 85,

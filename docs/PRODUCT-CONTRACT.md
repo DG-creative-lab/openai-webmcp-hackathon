@@ -6,17 +6,18 @@ For a Shopify merchant, turn verified product truth into measurable agent-select
 
 ## Demo outcome
 
-A judge can watch a generic listing move from 0/8 to 8/8 deterministic buyer-intent coverage, review the supporting evidence, approve the exact variant, publish it to the shopper view, and prepare a paused Ads projection. The same actions are available to an agent through WebMCP, except the merchant-only approval.
+A judge can watch a generic listing move from 0/8 to 8/8 deterministic buyer-intent coverage, review the supporting evidence, record exact digest-bound demo approval, publish it to the shopper view, and prepare a paused Ads projection. Approval and reset are absent from the WebMCP site-tool surface. Because this slice has no authentication, ordinary browser automation can still operate the visible UI and the demo does not claim enforced human authority.
 
 ## Non-negotiable invariants
 
 1. No product claim without a verified evidence record.
-2. No publication without explicit human approval of the exact variant digest.
+2. No demo publication without current approval state bound to the exact variant digest; do not present the credential-free UI gesture as authenticated merchant authority.
 3. No paid campaign activation or spend.
 4. Every agent action changes the same state the merchant sees.
 5. Every important effect produces a visible activity event.
 6. The app remains useful when WebMCP is unavailable.
-7. Only the visible merchant interface may reset the demonstration workspace.
+7. No WebMCP site tool may approve or reset the demonstration workspace; UI availability is not an authorization boundary.
+8. Shopper matching requires verified evidence represented in the current visible copy; hidden merchant evidence is not discoverability.
 
 ## Current adapters
 
@@ -32,3 +33,4 @@ A judge can watch a generic listing move from 0/8 to 8/8 deterministic buyer-int
 - Model-based graders and production experimentation statistics.
 - Multi-product catalogue ingestion.
 - Merchant tenancy, persistence and audit export.
+- Authenticated merchant identity and an approval grant bound to target, digest, policy and expiry.
