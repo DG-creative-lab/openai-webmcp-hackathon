@@ -65,6 +65,14 @@ function initialAdsPackage(): AppState["adsPackage"] {
 
 const listeners = new Set<() => void>();
 
+function freezeState<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.values(value).forEach((child) => freezeState(child));
+    Object.freeze(value);
+  }
+  return value;
+}
+
 function activity(actor: Activity["actor"], action: string, detail: string): Activity {
   return {
     id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -94,10 +102,10 @@ function initialState(webmcpAvailable: boolean, resetByMerchant = false): AppSta
   };
 }
 
-let state: AppState = initialState(false);
+let state: AppState = freezeState(initialState(false));
 
 function update(recipe: (current: AppState) => AppState): AppState {
-  state = recipe(state);
+  state = freezeState(recipe(state));
   listeners.forEach((listener) => listener());
   return state;
 }
@@ -143,7 +151,9 @@ export const appStore = {
     return evaluation;
   },
   stageVariant(actor: Activity["actor"] = "Agent") {
-    if (!state.variantEvaluation) throw new Error("Run the buyer-intent battery before staging.");
+    if (state.variant.status !== "draft" || !state.variantEvaluation) {
+      throw new Error("Only an evaluated draft can be staged for merchant review.");
+    }
     return update((current) => ({
       ...current,
       variant: { ...current.variant, status: "staged", approvedDigest: null, approvedAt: null },
@@ -171,7 +181,8 @@ export const appStore = {
     })).variant;
   },
   prepareAds(actor: Activity["actor"] = "Agent") {
-    if (state.variant.status !== "published") {
+    const currentDigest = digestVariant(state.variant, state.variant.evidenceIds);
+    if (state.variant.status !== "published" || state.variant.approvedDigest !== currentDigest) {
       throw new Error("Ads preparation blocked: publish the exact merchant-approved variant first.");
     }
     const copy = state.variant;
@@ -199,7 +210,8 @@ export const appStore = {
     })).adsPackage;
   },
   updateCart(quantity: number, actor: Activity["actor"] = "Agent") {
-    const safeQuantity = Math.max(0, Math.min(Math.floor(quantity), state.product.inventory));
+    const normalizedQuantity = Number.isFinite(quantity) ? Math.floor(quantity) : 0;
+    const safeQuantity = Math.max(0, Math.min(normalizedQuantity, state.product.inventory));
     update((current) => ({
       ...current,
       cartQuantity: safeQuantity,
@@ -208,7 +220,7 @@ export const appStore = {
     return safeQuantity;
   },
   reset() {
-    state = initialState(state.webmcpAvailable, true);
+    state = freezeState(initialState(state.webmcpAvailable, true));
     listeners.forEach((listener) => listener());
     return state;
   },
