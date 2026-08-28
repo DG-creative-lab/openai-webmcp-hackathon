@@ -17,6 +17,7 @@ A judge can watch a generic listing move from 0/8 to 8/8 deterministic buyer-int
 5. Every important effect produces a visible activity event.
 6. The app remains useful when WebMCP is unavailable.
 7. Only the visible merchant interface may reset the demonstration workspace.
+8. Shopper matching requires verified evidence represented in the current visible copy; hidden merchant evidence is not discoverability.
 
 ## Current adapters
 

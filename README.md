@@ -34,7 +34,7 @@ The app registers nine page-scoped tools with `document.modelContext.registerToo
 | `search_product_by_need` | Matches a shopper need to verified facts |
 | `update_demo_cart` | Updates visible demo cart state; never checks out |
 
-Every input schema is narrow and rejects additional properties. Read-only tools declare `readOnlyHint`. Mutating tools describe their side effects and return enough state for the caller to verify the result.
+Every input schema is narrow and rejects additional properties. Read-only tools declare `readOnlyHint`. Every successful result identifies its effect class, authority, whether state or an external system changed, the current workspace snapshot, and the safest next action.
 
 ## Authority model
 
@@ -71,14 +71,12 @@ Product delivery is organized across hackathon, standalone beta, platform-integr
 
 ## Demo flow
 
-1. Select **Reset demo** and confirm to start from the verified baseline.
-2. In **Growth studio**, run the buyer-intent battery.
-3. Stage the tested variant.
-4. Approve the exact variant in the human UI.
-5. Publish it to the demo storefront.
-6. Prepare the paid projection.
-7. Switch to **Shopper view** and see the same approved copy.
-8. Ask Codex to inspect the growth workspace, search for a rainproof 16-inch laptop bag, or update the demo cart through the site tools.
+1. Select **Reset demo** and confirm to return to the generic 0/8 baseline.
+2. In **Growth studio**, use the exact starter prompt shown in the six-checkpoint judge guide.
+3. Let Codex inspect evidence, create and evaluate the 8/8 draft, and stage it for review.
+4. At the orange human gate, approve the exact variant in the visible merchant UI.
+5. Tell Codex to continue with the prompt shown by the guide. It publishes the approved demo copy, prepares the PAUSED paid projection, verifies the shopper match and updates the cart.
+6. Switch to **Shopper view** and verify the same approved copy and cart state.
 
 The reset control is deliberately merchant-only and is not exposed as a WebMCP tool. It clears evaluation, approval, channel projections, cart state and prior activity while preserving the verified product evidence and the browser's WebMCP registration.
 

@@ -43,9 +43,9 @@ const baselineEvaluation = evaluateCopy(product.baseline, evidence, "Current Sho
 function initialVariant(): AppState["variant"] {
   return {
     id: "variant-urban-24-v1",
-    ...variantCopy,
-    bullets: [...variantCopy.bullets],
-    status: "draft",
+    ...product.baseline,
+    bullets: [...product.baseline.bullets],
+    status: "baseline",
     evidenceIds: evidence.map((item) => item.id),
     approvedDigest: null,
     approvedAt: null,
@@ -138,10 +138,14 @@ export const appStore = {
         publishedAt: null,
       },
       variantEvaluation: null,
+      adsPackage: initialAdsPackage(),
       activities: addActivity(current, actor, "Variant generated", "Rewrote the product around eight verified buyer-relevant facts."),
     })).variant;
   },
   runEvaluation(actor: Activity["actor"] = "Agent") {
+    if (state.variant.status !== "draft") {
+      throw new Error("Evaluation blocked: create an evidence-led draft first.");
+    }
     const evaluation = evaluateCopy(state.variant, state.evidence, "Evidence-led variant");
     update((current) => ({
       ...current,

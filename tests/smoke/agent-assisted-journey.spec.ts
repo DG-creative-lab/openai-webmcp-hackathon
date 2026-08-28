@@ -33,7 +33,9 @@ test.beforeEach(async ({ page }) => {
 
 test("an agent discovers the tools and completes the journey with merchant approval", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("9 site tools live")).toBeVisible();
+  await expect(page.getByText("9 site tools · 3 read / 6 state")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start with one agent prompt" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Modular Commuter Pack" })).toBeVisible();
 
   const toolNames = await page.evaluate(() => (window as unknown as {
     __webmcpTools: Array<{ name: string }>;
@@ -51,22 +53,45 @@ test("an agent discovers the tools and completes the journey with merchant appro
   expect(toolNames).toHaveLength(9);
   expect(toolNames.some((name) => name.startsWith("approve_") || name.startsWith("reset_"))).toBe(false);
 
-  await executeTool(page, "create_evidence_led_variant");
-  const evaluation = await executeTool(page, "run_buyer_intent_battery") as { score: number; total: number };
-  expect(evaluation).toMatchObject({ score: 8, total: 8 });
+  const workspace = await executeTool(page, "get_growth_workspace") as {
+    effect: { class: string; changedState: boolean; externalWrite: boolean };
+  };
+  expect(workspace.effect).toEqual({
+    class: "read",
+    changedState: false,
+    externalWrite: false,
+    requiresMerchantApproval: false,
+    authority: "Agent may inspect verified merchant-controlled state.",
+  });
+
+  const draft = await executeTool(page, "create_evidence_led_variant") as {
+    effect: { class: string };
+  };
+  expect(draft.effect.class).toBe("draft");
+  await expect(page.getByRole("heading", { name: "24L Waterproof Commuter Backpack + Pannier" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Run the fixed buyer test" })).toBeVisible();
+
+  const evaluation = await executeTool(page, "run_buyer_intent_battery") as {
+    evaluation: { score: number; total: number };
+  };
+  expect(evaluation.evaluation).toMatchObject({ score: 8, total: 8 });
   await executeTool(page, "stage_variant_for_merchant_review");
 
   await expect(executeTool(page, "publish_merchant_approved_variant")).rejects.toThrow(/approval/i);
+  await expect(page.getByRole("heading", { name: "Merchant approval required" })).toBeVisible();
+  await expect(page.getByText("No site tool can perform this action.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Approve exact variant" })).toBeVisible();
   await page.getByRole("button", { name: "Approve exact variant" }).click();
+  await expect(page.getByRole("heading", { name: "Continue after human approval" })).toBeVisible();
 
   await executeTool(page, "publish_merchant_approved_variant");
   const ads = await executeTool(page, "prepare_openai_ads_package") as {
-    campaignStatus: string;
-    disclaimer: string;
+    adsPackage: { campaignStatus: string; disclaimer: string };
+    effect: { class: string; externalWrite: boolean };
   };
-  expect(ads.campaignStatus).toBe("PAUSED");
-  expect(ads.disclaimer).toMatch(/No Ads API call/);
+  expect(ads.adsPackage.campaignStatus).toBe("PAUSED");
+  expect(ads.adsPackage.disclaimer).toMatch(/No Ads API call/);
+  expect(ads.effect).toMatchObject({ class: "paid_projection", externalWrite: false });
   await expect(page.getByText("Feed ready · Campaign PAUSED")).toBeVisible();
 
   const recommendation = await executeTool(page, "search_product_by_need", {
@@ -80,9 +105,12 @@ test("an agent discovers the tools and completes the journey with merchant appro
     checkoutStarted: boolean;
     paymentAttempted: boolean;
   };
-  expect(cart).toEqual({ quantity: 2, checkoutStarted: false, paymentAttempted: false });
+  expect(cart).toMatchObject({ quantity: 2, checkoutStarted: false, paymentAttempted: false });
+  await expect(page.getByRole("heading", { name: "Judge journey complete" })).toBeVisible();
 
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.getByRole("button", { name: /Shopper view 2/ }).click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await expect(page.getByRole("heading", { name: "24L Waterproof Commuter Backpack + Pannier" })).toBeVisible();
   await expect(page.getByText("This page exposes verified fit, weather, repair, price and delivery facts through 9 WebMCP site tools.")).toBeVisible();
 });

@@ -1,14 +1,44 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { appStore } from "./store/appStore";
-import type { Activity, IntentResult, VariantStatus } from "./domain/types";
+import type { Activity, AppState, IntentResult } from "./domain/types";
 import "./styles.css";
 
-const workflow: { key: VariantStatus; number: string; label: string }[] = [
-  { key: "draft", number: "01", label: "Evidence copy" },
-  { key: "staged", number: "02", label: "Buyer tests" },
-  { key: "approved", number: "03", label: "Human approval" },
-  { key: "published", number: "04", label: "Channel publish" },
+const journeySteps = [
+  { number: "01", label: "Evidence draft", actor: "Agent", effect: "Draft only" },
+  { number: "02", label: "Buyer evaluation", actor: "Agent", effect: "Simulation" },
+  { number: "03", label: "Review stage", actor: "Agent", effect: "No publish" },
+  { number: "04", label: "Exact approval", actor: "Merchant", effect: "Human gate" },
+  { number: "05", label: "Channel projection", actor: "Agent", effect: "Demo + £0 paid" },
+  { number: "06", label: "Shopper cart", actor: "Agent", effect: "No checkout" },
 ];
+
+const starterPrompt = "Inspect this Conversion Lab workspace. Create and evaluate an evidence-led product variant, stage it for merchant review, and stop before approval.";
+const continuationPrompt = "Continue the approved journey: publish the exact variant, prepare the PAUSED Ads projection, find the product for a waterproof 16-inch laptop need, and set the demo cart quantity to 2.";
+
+function journeyGuide(state: AppState) {
+  if (state.adsPackage.status === "ready" && state.cartQuantity > 0) {
+    return { progress: 6, actor: "Complete", effect: "Verified", title: "Judge journey complete", instruction: "Open Shopper view to verify the approved copy and shared cart.", prompt: null };
+  }
+  if (state.adsPackage.status === "ready") {
+    return { progress: 5, actor: "Agent", effect: "Demo cart", title: "Complete the shopper handoff", instruction: "Match the published product to the shopper need and set the visible cart quantity to 2. Checkout stays unavailable.", prompt: continuationPrompt };
+  }
+  if (state.variant.status === "published") {
+    return { progress: 4, actor: "Agent", effect: "Paid projection", title: "Project the approved truth", instruction: "Prepare the OpenAI Ads package. It must remain PAUSED, credential-free and £0 spend.", prompt: continuationPrompt };
+  }
+  if (state.variant.status === "approved") {
+    return { progress: 4, actor: "Agent", effect: "Demo publish", title: "Continue after human approval", instruction: "Publish the exact approved digest to the demo storefront, then prepare the paid projection.", prompt: continuationPrompt };
+  }
+  if (state.variant.status === "staged") {
+    return { progress: 3, actor: "Merchant", effect: "Human gate", title: "Merchant approval required", instruction: "Review the tested copy and select Approve exact variant. No site tool can perform this action.", prompt: null };
+  }
+  if (state.variant.status === "draft" && state.variantEvaluation) {
+    return { progress: 2, actor: "Agent", effect: "Review stage", title: "Stage the tested variant", instruction: "Move the 8/8 draft into merchant review, then stop. Staging does not approve or publish it.", prompt: starterPrompt };
+  }
+  if (state.variant.status === "draft") {
+    return { progress: 1, actor: "Agent", effect: "Simulation", title: "Run the fixed buyer test", instruction: "Evaluate this evidence-led draft against the same eight buyer needs used for the baseline.", prompt: starterPrompt };
+  }
+  return { progress: 0, actor: "Agent", effect: "Read + draft", title: "Start with one agent prompt", instruction: "The agent inspects verified evidence, creates a better draft, evaluates it and stops at the human gate.", prompt: starterPrompt };
+}
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
@@ -49,7 +79,7 @@ function AppHeader() {
       <div className="header-actions">
         <div className="connection-state">
           <StatusDot tone={state.webmcpAvailable ? "good" : "neutral"} />
-          <span>{state.webmcpAvailable ? "9 site tools live" : "WebMCP-ready"}</span>
+          <span>{state.webmcpAvailable ? "9 site tools · 3 read / 6 state" : "WebMCP-ready"}</span>
         </div>
         <button
           type="button"
@@ -87,16 +117,26 @@ function ScoreRing({ score, total, muted = false }: { score: number; total: numb
   );
 }
 
-function WorkflowRail({ status }: { status: VariantStatus }) {
-  const rank: Record<VariantStatus, number> = { baseline: 0, draft: 1, staged: 2, approved: 3, published: 4 };
+function JudgeGuide({ state }: { state: AppState }) {
+  const guide = journeyGuide(state);
   return (
-    <ol className="workflow-rail">
-      {workflow.map((step, index) => (
-        <li key={step.key} className={rank[status] >= index + 1 ? "is-done" : ""}>
-          <span>{step.number}</span><p>{step.label}</p>
-        </li>
-      ))}
-    </ol>
+    <section className={`judge-guide ${guide.effect === "Human gate" ? "is-human-gate" : ""}`} aria-labelledby="judge-guide-title">
+      <div className="guide-copy">
+        <div className="guide-kicker"><span>Guided judge journey</span><span>{guide.progress === 6 ? "06 / 06" : `${String(guide.progress + 1).padStart(2, "0")} / 06`}</span></div>
+        <div className="guide-actor"><span>{guide.actor}</span><span>{guide.effect}</span></div>
+        <h2 id="judge-guide-title">{guide.title}</h2>
+        <p>{guide.instruction}</p>
+        {guide.prompt && <div className="guide-prompt"><span>Say to Codex</span><code>{guide.prompt}</code></div>}
+      </div>
+      <ol className="guide-steps" aria-label="Six checkpoint demo progress">
+        {journeySteps.map((step, index) => (
+          <li key={step.number} className={index < guide.progress ? "is-done" : index === guide.progress ? "is-current" : ""}>
+            <span className="guide-step-number">{step.number}</span>
+            <div><strong>{step.label}</strong><small>{step.actor} · {step.effect}</small></div>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -128,25 +168,28 @@ function ActivityLog({ items }: { items: Activity[] }) {
 
 function Studio() {
   const state = useSyncExternalStore(appStore.subscribe, appStore.getState);
-  const score = state.variantEvaluation?.score ?? 0;
+  const score = state.variantEvaluation?.score ?? state.baselineEvaluation.score;
   const canStage = Boolean(state.variantEvaluation) && state.variant.status === "draft";
   const canApprove = state.variant.status === "staged";
   const canPublish = state.variant.status === "approved";
   const isPublished = state.variant.status === "published";
+  const isComplete = state.adsPackage.status === "ready" && state.cartQuantity > 0;
 
   const runPrimaryAction = () => {
     try {
-      if (!state.variantEvaluation) appStore.runEvaluation("Merchant");
+      if (state.variant.status === "baseline") appStore.generateVariant("Merchant");
+      else if (!state.variantEvaluation) appStore.runEvaluation("Merchant");
       else if (canStage) appStore.stageVariant("Merchant");
       else if (canApprove) appStore.approveVariant();
       else if (canPublish) appStore.publishVariant("Merchant");
-      else appStore.prepareAds("Merchant");
+      else if (state.adsPackage.status !== "ready") appStore.prepareAds("Merchant");
+      else appStore.setSurface("storefront");
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "The action could not be completed.");
     }
   };
 
-  const actionLabel = !state.variantEvaluation ? "Run buyer tests" : canStage ? "Stage for review" : canApprove ? "Approve exact variant" : canPublish ? "Publish to demo store" : state.adsPackage.status !== "ready" ? "Prepare paid projection" : "Package ready";
+  const actionLabel = state.variant.status === "baseline" ? "Create evidence-led draft" : !state.variantEvaluation ? "Run buyer tests" : canStage ? "Stage for review" : canApprove ? "Approve exact variant" : canPublish ? "Publish to demo store" : state.adsPackage.status !== "ready" ? "Prepare paid projection" : isComplete ? "Journey complete" : "Open shopper view";
 
   return (
     <main className="studio page-enter">
@@ -157,6 +200,8 @@ function Studio() {
         </div>
         <p className="intro-note">One evidence layer. One approved message. Two acquisition surfaces.</p>
       </section>
+
+      <JudgeGuide state={state} />
 
       <section className="workspace-grid">
         <div className="product-visual">
@@ -172,7 +217,6 @@ function Studio() {
           <div className="panel-kicker"><span>Active experiment</span><span className={`state-label state-label--${state.variant.status}`}>{state.variant.status}</span></div>
           <h2>{state.variant.title}</h2>
           <p className="variant-description">{state.variant.description}</p>
-          <WorkflowRail status={state.variant.status} />
 
           <div className="score-comparison">
             <div><ScoreRing score={state.baselineEvaluation.score} total={state.baselineEvaluation.total} muted /><p>Current copy</p></div>
@@ -181,10 +225,10 @@ function Studio() {
             <div className="score-copy"><strong>{score === 8 ? "8 buyer needs resolved" : "Evidence is ready"}</strong><span>{score === 8 ? "Every match can be traced to a source." : "Run the same task battery agents will face."}</span></div>
           </div>
 
-          <button className="primary-action" onClick={runPrimaryAction} disabled={state.adsPackage.status === "ready"}>
+          <button className={`primary-action ${canApprove ? "is-merchant-gate" : ""}`} onClick={runPrimaryAction} disabled={isComplete}>
             <span>{actionLabel}</span><span aria-hidden="true">↗</span>
           </button>
-          <p className="authority-note"><span>Authority boundary</span> Agents may draft, test and stage. A merchant approves. Paid activation is never available.</p>
+          <p className={`authority-note ${canApprove ? "is-merchant-gate" : ""}`}><span>{canApprove ? "Merchant gate" : "Authority boundary"}</span>{canApprove ? "The agent has stopped. Only the visible merchant control can approve this exact digest." : "Agents may draft, test and stage. A merchant approves. Paid activation is never available."}</p>
         </div>
       </section>
 
@@ -264,5 +308,10 @@ function Storefront() {
 
 export default function App() {
   const state = useSyncExternalStore(appStore.subscribe, appStore.getState);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [state.surface]);
+
   return <><AppHeader />{state.surface === "studio" ? <Studio /> : <Storefront />}</>;
 }

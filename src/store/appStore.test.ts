@@ -4,6 +4,14 @@ import { appStore } from "./appStore";
 describe("merchant authority boundary", () => {
   beforeEach(() => appStore.reset());
 
+  it("starts from the generic baseline and requires a draft before evaluation", () => {
+    expect(appStore.getState().variant).toMatchObject({
+      title: "Modular Commuter Pack",
+      status: "baseline",
+    });
+    expect(() => appStore.runEvaluation("Agent")).toThrow(/create an evidence-led draft/i);
+  });
+
   it("blocks publication before exact merchant approval", () => {
     expect(() => appStore.publishVariant("Agent")).toThrow(/approval/i);
   });
@@ -43,8 +51,8 @@ describe("merchant authority boundary", () => {
 
     expect(resetState.surface).toBe("studio");
     expect(resetState.variant).toMatchObject({
-      title: "24L Waterproof Commuter Backpack + Pannier",
-      status: "draft",
+      title: "Modular Commuter Pack",
+      status: "baseline",
       approvedDigest: null,
       approvedAt: null,
       publishedAt: null,

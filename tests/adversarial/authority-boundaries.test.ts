@@ -83,6 +83,21 @@ describe("adversarial authority and lifecycle boundaries", () => {
     expect(() => appStore.publishVariant("Agent")).toThrow(/approval/i);
   });
 
+  it("invalidates a stale paid projection when a new draft is generated", () => {
+    reach("published");
+    appStore.prepareAds("Agent");
+    expect(appStore.getState().adsPackage.status).toBe("ready");
+
+    appStore.generateVariant("Agent");
+
+    expect(appStore.getState().variant.status).toBe("draft");
+    expect(appStore.getState().adsPackage).toMatchObject({
+      status: "not_prepared",
+      campaignStatus: "not_created",
+      feed: null,
+    });
+  });
+
   it("does not expose mutable authoritative state to a caller", () => {
     const snapshot = appStore.getState();
     const originalTitle = snapshot.variant.title;
@@ -128,6 +143,27 @@ describe("adversarial authority and lifecycle boundaries", () => {
     expect(result.match).toBe(false);
     expect(result.evidence).toEqual([]);
     expect(result.note).toMatch(/No verified evidence/i);
+  });
+
+  it("does not expose verified but hidden facts as shopper matches before publication", async () => {
+    const tools = await registeredTools();
+    const search = tools.find((tool) => tool.name === "search_product_by_need");
+    const before = await search?.execute({ query: "waterproof bag for a 16-inch laptop" }) as {
+      match: boolean;
+      evidence: unknown[];
+      note: string;
+    };
+
+    expect(before).toMatchObject({ match: false, evidence: [] });
+    expect(before.note).toMatch(/current visible copy/i);
+
+    reach("published");
+    const after = await search?.execute({ query: "waterproof bag for a 16-inch laptop" }) as {
+      match: boolean;
+      evidence: unknown[];
+    };
+    expect(after.match).toBe(true);
+    expect(after.evidence).toHaveLength(2);
   });
 
   it("prepares only a PAUSED, zero-spend projection after exact publication", () => {

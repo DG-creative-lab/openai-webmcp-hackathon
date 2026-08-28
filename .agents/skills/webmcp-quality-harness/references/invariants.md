@@ -8,6 +8,7 @@ Use these invariants as independent test claims. Update this ledger only when th
 | AUTH-02 | Publication requires approval bound to the exact copy and evidence IDs. | Approval digest check in `publishVariant`. | Stale-approval and illegal-transition tests. |
 | AUTH-03 | An agent cannot reset the merchant workspace. | Reset exists only in the visible merchant UI. | Tool inventory assertion. |
 | EVID-01 | Buyer-intent matches require verified evidence and matching supported terms. | `evaluateCopy` and `search_product_by_need`. | Verified/unverified and unsupported-need tests. |
+| EVID-02 | Shopper matching requires verified evidence represented in the current visible copy; verified but hidden facts remain a no-match. | `search_product_by_need` evaluates representation coverage before matching the query. | Before/after publication adversarial comparison. |
 | LIFE-01 | Legal progression is evaluated draft → staged → approved → published. | Store transition guards. | Decision-table adversarial tests. |
 | STATE-01 | External callers cannot mutate the authoritative shared snapshot. | Recursively frozen store snapshots. | Mutation attempt test. |
 | ADS-01 | Ads preparation uses the exact approved publication and remains a PAUSED projection. | Digest/status guard and fixed campaign status. | Precondition and zero-authority projection tests. |
