@@ -1,3 +1,6 @@
+import type { CommerceContractVersion, CommerceIdentity, EffectReceipt, SourceProvenance } from "../commerce/contracts";
+import type { ShopifyOperationPreview } from "../commerce/shopifyAdminPreview";
+
 export type Surface = "studio" | "storefront";
 export type VariantStatus = "baseline" | "draft" | "staged" | "approved" | "published";
 export type Channel = "shopify-webmcp" | "openai-ads";
@@ -118,6 +121,16 @@ export interface AdsPackage {
   disclaimer: string;
 }
 
+export interface CommerceIntegrationState {
+  mode: "fixture" | "shopify";
+  contractVersion: CommerceContractVersion;
+  sourceIdentity: CommerceIdentity;
+  provenance: SourceProvenance;
+  readReceipt: EffectReceipt;
+  readPreview: ShopifyOperationPreview;
+  updatePreview: ShopifyOperationPreview | null;
+}
+
 export interface AppState {
   surface: Surface;
   product: Product;
@@ -125,6 +138,7 @@ export interface AppState {
   variant: Variant;
   baselineEvaluation: Evaluation;
   variantEvaluation: Evaluation | null;
+  commerce: CommerceIntegrationState;
   adsPackage: AdsPackage;
   cartQuantity: number;
   webmcpAvailable: boolean;

@@ -213,4 +213,18 @@ describe("adversarial authority and lifecycle boundaries", () => {
     expect(ads.feed).toMatchObject({ identifier_exists: "no", is_ads_eligible: true });
     expect(ads.validation).toMatchObject({ scope: "local_schema", valid: true, errors: [] });
   });
+
+  it("keeps the Shopify adapter at a credential-free, non-executing preview boundary", () => {
+    reach("published");
+    const preview = appStore.getState().commerce.updatePreview;
+
+    expect(preview).toMatchObject({
+      mode: "preview",
+      operation: "update_product",
+      status: "preview_ready",
+      externalWrite: false,
+      payload: { requiredScopes: ["write_products"], execution: "blocked_preview" },
+    });
+    expect(JSON.stringify(preview)).not.toMatch(/access[_-]?token|secret|authorization/i);
+  });
 });

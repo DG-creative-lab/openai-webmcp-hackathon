@@ -1,32 +1,21 @@
+import { createFieldworkFixtureSnapshot } from "../commerce/fieldworkFixture";
+import { previewShopifyProductRead, previewShopifyProductUpdate } from "../commerce/shopifyAdminPreview";
 import { digestVariant, evaluateCopy } from "../domain/evaluation";
 import { validateOpenAIProductFeedRow } from "../domain/openaiProductFeed";
 import type { Activity, AppState, OpenAIProductFeedRow, ProductCopy, Surface } from "../domain/types";
 
-const evidence = [
-  { id: "ev-waterproof", label: "Weather protection", value: "IPX6 waterproof", source: "Independent spray test · LAB-117", verified: true, tags: ["waterproof", "rain"] },
-  { id: "ev-laptop", label: "Laptop sleeve", value: "Fits up to 16-inch laptop", source: "Product specification · PS-24L", verified: true, tags: ["laptop", "commute"] },
-  { id: "ev-repair", label: "Repair programme", value: "5 years for zips, buckles and seams", source: "Repair policy · RP-05", verified: true, tags: ["repair", "durability"] },
-  { id: "ev-price", label: "Retail price", value: "£159", source: "Shopify price · live", verified: true, tags: ["price"] },
-  { id: "ev-delivery", label: "Dispatch promise", value: "Dispatches today for Friday delivery", source: "Warehouse SLA · live", verified: true, tags: ["delivery"] },
-  { id: "ev-weight", label: "Product weight", value: "1.2kg", source: "Product specification · PS-24L", verified: true, tags: ["weight"] },
-  { id: "ev-rack", label: "Rack attachment", value: "Rack system tested to 12kg", source: "Load test · LAB-104", verified: true, tags: ["bike", "rack"] },
-  { id: "ev-capacity", label: "Capacity", value: "24L", source: "Product specification · PS-24L", verified: true, tags: ["capacity"] },
-];
-
+const commerceSnapshot = createFieldworkFixtureSnapshot();
+const evidence = commerceSnapshot.evidence.map(({ id, label, value, source, verified, tags }) => ({ id, label, value, source, verified, tags: [...tags] }));
 const product = {
-  id: "gid://shopify/Product/urban-24",
-  sku: "URB-24-BLK",
-  handle: "modular-commuter-24",
-  brand: "Fieldwork Supply",
-  price: 159,
-  currency: "GBP" as const,
-  inventory: 18,
-  image: "/commuter-pack.png",
-  baseline: {
-    title: "Modular Commuter Pack",
-    description: "A versatile technical bag designed for everyday movement through the city.",
-    bullets: ["Flexible carry modes", "Durable construction", "Built for daily use"],
-  },
+  id: commerceSnapshot.product.identity.productId,
+  sku: commerceSnapshot.product.sku,
+  handle: commerceSnapshot.product.handle,
+  brand: commerceSnapshot.product.brand,
+  price: commerceSnapshot.product.price,
+  currency: commerceSnapshot.product.currency,
+  inventory: commerceSnapshot.product.inventory,
+  image: commerceSnapshot.product.image,
+  baseline: { ...commerceSnapshot.product.baseline, bullets: [...commerceSnapshot.product.baseline.bullets] },
 };
 
 const variantCopy: ProductCopy = {
@@ -65,6 +54,19 @@ function initialAdsPackage(): AppState["adsPackage"] {
   };
 }
 
+function initialCommerce(): AppState["commerce"] {
+  const sourceIdentity = { ...commerceSnapshot.product.identity };
+  return {
+    mode: commerceSnapshot.mode,
+    contractVersion: commerceSnapshot.contractVersion,
+    sourceIdentity,
+    provenance: { ...commerceSnapshot.product.provenance },
+    readReceipt: { ...commerceSnapshot.readReceipt, target: { ...commerceSnapshot.readReceipt.target } },
+    readPreview: previewShopifyProductRead(sourceIdentity.storeId, sourceIdentity.productId),
+    updatePreview: null,
+  };
+}
+
 const listeners = new Set<() => void>();
 
 function freezeState<T>(value: T): T {
@@ -93,13 +95,14 @@ function initialState(webmcpAvailable: boolean, resetByBrowserUser = false): App
     variant: initialVariant(),
     baselineEvaluation,
     variantEvaluation: null,
+    commerce: initialCommerce(),
     adsPackage: initialAdsPackage(),
     cartQuantity: 0,
     webmcpAvailable,
     activities: [
       resetByBrowserUser
         ? activity("Browser user", "Demo reset", "Cleared evaluation, approval, channel projections and cart state. Returned to the verified baseline.")
-        : activity("System", "Evidence synced", "8 verified Shopify and operations facts are ready for agent use."),
+        : activity("System", "Fixture adapter loaded", "8 provenance-bound fixture facts are ready through commerce contract v1; no Shopify request was sent."),
     ],
   };
 }
@@ -140,6 +143,7 @@ export const appStore = {
         publishedAt: null,
       },
       variantEvaluation: null,
+      commerce: { ...current.commerce, updatePreview: null },
       adsPackage: initialAdsPackage(),
       activities: addActivity(current, actor, "Variant generated", "Rewrote the product around eight verified buyer-relevant facts."),
     })).variant;
@@ -180,10 +184,17 @@ export const appStore = {
     if (state.variant.status !== "approved" || state.variant.approvedDigest !== currentDigest) {
       throw new Error("Publication blocked: this exact variant does not have current digest-bound approval state.");
     }
+    const updatePreview = previewShopifyProductUpdate({
+      shopDomain: state.commerce.sourceIdentity.storeId,
+      productId: state.commerce.sourceIdentity.productId,
+      approvedDigest: currentDigest,
+      copy: state.variant,
+    });
     return update((current) => ({
       ...current,
       variant: { ...current.variant, status: "published", publishedAt: new Date().toISOString() },
-      activities: addActivity(current, actor, "Shopify projection published", "The approved copy is now visible in the demo storefront."),
+      commerce: { ...current.commerce, updatePreview },
+      activities: addActivity(current, actor, "Shopify preview prepared", "The approved copy is visible in the demo storefront and mapped to a blocked Shopify Admin update preview; no live write occurred."),
     })).variant;
   },
   prepareAds(actor: Activity["actor"] = "Agent") {

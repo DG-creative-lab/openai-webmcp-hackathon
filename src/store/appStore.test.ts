@@ -9,6 +9,14 @@ describe("demo lifecycle boundary", () => {
       title: "Modular Commuter Pack",
       status: "baseline",
     });
+    expect(appStore.getState().commerce).toMatchObject({
+      mode: "fixture",
+      contractVersion: "conversion-lab.commerce.v1",
+      sourceIdentity: { provider: "fixture", storeId: "fieldwork-demo.myshopify.com", productId: "gid://shopify/Product/108828309" },
+      readReceipt: { status: "simulated", externalEffect: false },
+      readPreview: { operation: "read_product", externalWrite: false },
+      updatePreview: null,
+    });
     expect(() => appStore.runEvaluation("Agent")).toThrow(/create an evidence-led draft/i);
   });
 
@@ -21,7 +29,18 @@ describe("demo lifecycle boundary", () => {
     expect(appStore.runEvaluation("Agent").score).toBe(8);
     expect(appStore.stageVariant("Agent").status).toBe("staged");
     expect(appStore.recordVisibleApproval().approvedDigest).toMatch(/^fnv1a-/);
-    expect(appStore.publishVariant("Agent").status).toBe("published");
+    const published = appStore.publishVariant("Agent");
+    expect(published.status).toBe("published");
+    expect(appStore.getState().commerce.updatePreview).toMatchObject({
+      operation: "update_product",
+      payloadDigest: published.approvedDigest,
+      externalWrite: false,
+      payload: {
+        variables: { product: { id: "gid://shopify/Product/108828309", title: published.title, descriptionHtml: published.description } },
+        requiredScopes: ["write_products"],
+        execution: "blocked_preview",
+      },
+    });
   });
 
   it("prepares paid media only as a paused, zero-authority projection", () => {
@@ -61,6 +80,7 @@ describe("demo lifecycle boundary", () => {
       publishedAt: null,
     });
     expect(resetState.variantEvaluation).toBeNull();
+    expect(resetState.commerce.updatePreview).toBeNull();
     expect(resetState.adsPackage).toMatchObject({
       status: "not_prepared",
       campaignStatus: "not_created",
@@ -83,6 +103,7 @@ describe("demo lifecycle boundary", () => {
       surface: current.surface,
       variant: current.variant,
       evaluation: current.variantEvaluation,
+      commerce: current.commerce,
       ads: current.adsPackage,
       cart: current.cartQuantity,
       activity: current.activities[0]?.action,

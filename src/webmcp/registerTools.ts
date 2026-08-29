@@ -94,6 +94,14 @@ function snapshot() {
     product: { id: state.product.id, sku: state.product.sku, price: state.product.price, inventory: state.product.inventory },
     variant: { id: state.variant.id, status: state.variant.status, approvedDigest: state.variant.approvedDigest },
     evaluation: state.variantEvaluation ? { score: state.variantEvaluation.score, total: state.variantEvaluation.total } : null,
+    commerce: {
+      mode: state.commerce.mode,
+      contractVersion: state.commerce.contractVersion,
+      sourceIdentity: state.commerce.sourceIdentity,
+      shopifyUpdatePreview: state.commerce.updatePreview
+        ? { operation: state.commerce.updatePreview.operation, status: state.commerce.updatePreview.status, externalWrite: false }
+        : null,
+    },
     ads: { status: state.adsPackage.status, campaignStatus: state.adsPackage.campaignStatus, validation: state.adsPackage.validation },
     cartQuantity: state.cartQuantity,
   };
@@ -167,6 +175,7 @@ export async function registerWebMCPTools(): Promise<boolean> {
         return success(effects.read, {
           product: state.product,
           evidence: state.evidence,
+          commerce: state.commerce,
           currentCopy: state.variant.status === "baseline" ? state.product.baseline : state.variant,
         }, "Create an evidence-led draft, or audit channel readiness before deciding what is needed.");
       }),
@@ -219,11 +228,15 @@ export async function registerWebMCPTools(): Promise<boolean> {
       description: "Publish only the exact variant with current digest-bound demo approval state to the visible storefront. The approval is a credential-free UI gesture, not authenticated merchant authority; no live Shopify write occurs.",
       inputSchema: emptySchema,
       annotations: stateChangeAnnotations,
-      execute: noInput(async () => success(effects.publish, {
-        variant: appStore.publishVariant("Agent"),
-        surface: "demo Shopify storefront",
-        liveExternalWrite: false,
-      }, "Prepare the PAUSED OpenAI Ads projection from the same approved copy.")),
+      execute: noInput(async () => {
+        const variant = appStore.publishVariant("Agent");
+        return success(effects.publish, {
+          variant,
+          shopifyUpdatePreview: appStore.getState().commerce.updatePreview,
+          surface: "demo Shopify storefront",
+          liveExternalWrite: false,
+        }, "Prepare the PAUSED OpenAI Ads projection from the same approved copy.");
+      }),
     },
     {
       name: "prepare_openai_ads_package",
