@@ -99,16 +99,16 @@ export function previewShopifyProductRead(shopDomain: string, productId: string)
   };
 }
 
-export function previewShopifyProductUpdate(input: {
+export async function previewShopifyProductUpdate(input: {
   approval: Readonly<ApprovalEnvelope>;
   representation: Readonly<RepresentationVariant>;
   evidence: readonly EvidenceRecord[];
-}): ShopifyOperationPreview {
+}): Promise<ShopifyOperationPreview> {
   if (input.approval.target.provider !== "shopify") {
     throw new Error("Shopify update preview blocked: approval must target a Shopify product identity.");
   }
   const previewTarget = target(input.approval.target.storeId, input.approval.target.productId);
-  const approvedDigest = assertApprovalBinding(input);
+  const approvedDigest = await assertApprovalBinding(input);
   if (!input.representation.copy.title.trim() || !input.representation.copy.description.trim()) {
     throw new Error("Shopify update preview blocked: title and description must be non-empty.");
   }

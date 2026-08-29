@@ -14,7 +14,7 @@ Conversion Lab makes that gap measurable. It:
 2. Generates an evidence-bound product variant.
 3. Runs eight deterministic buyer-intent tasks.
 4. Stages the result at a visible browser review checkpoint.
-5. Hash-binds the demo approval state to the exact copy and evidence set.
+5. Binds the demo approval state with a versioned SHA-256 digest over the canonical product target, exact copy, complete evidence content, tags and provenance.
 6. Publishes only that digest-approved version to the demo storefront.
 7. Produces a locally schema-validated OpenAI Ads product-feed row and **PAUSED** campaign projection.
 
@@ -39,7 +39,7 @@ Every input schema is narrow and rejects additional properties. Read-only tools 
 ## Authority model
 
 - Site tools may read evidence, draft, evaluate and stage; no approval or reset site tool is registered.
-- The visible browser interface records the demo approval gesture, bound to an FNV-1a digest of exact copy plus sorted evidence IDs.
+- The visible browser interface records the demo approval gesture in a deeply frozen envelope bound by a `sha256-v1` Web Crypto digest to the canonical Shopify product target, exact copy, complete runtime-validated evidence content, tags and provenance.
 - This credential-free demo does not authenticate the browser actor and therefore does not claim enforced human or merchant-only authority. A production Shopify write requires an authenticated merchant grant bound to the same target and digest.
 - Publishing fails if approval is missing or stale.
 - The Ads integration is deliberately a projection: no credential, external API write, activation or spend path exists in this demo.

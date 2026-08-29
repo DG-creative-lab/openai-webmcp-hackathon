@@ -87,7 +87,7 @@ describe("WebMCP registration", () => {
     });
     await expect(execute("publish_approved_variant")).rejects.toThrow(/approval/i);
 
-    appStore.recordVisibleApproval();
+    await appStore.recordVisibleApproval();
     await expect(execute("publish_approved_variant")).resolves.toMatchObject({
       effect: { class: "demo_publish", requiresApprovalState: true, approvalAssurance: "demo_ui_gesture", externalWrite: false },
       surface: "demo Shopify storefront",

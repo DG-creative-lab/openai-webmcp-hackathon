@@ -155,6 +155,12 @@ function representationFor(current: AppState, payloadDigest: string): Representa
   };
 }
 
+function assertWorkspaceUnchanged(expected: AppState, action: string): void {
+  if (state !== expected) {
+    throw new Error(`${action} blocked: the workspace changed while approval evidence was being verified; retry from current state.`);
+  }
+}
+
 export const appStore = {
   getState: () => state,
   subscribe(listener: () => void) {
@@ -207,18 +213,20 @@ export const appStore = {
       activities: addActivity(current, actor, "Variant staged", "The tested variant is ready at the visible review checkpoint; no live channel changed."),
     })).variant;
   },
-  recordVisibleApproval() {
-    if (state.variant.status !== "staged") throw new Error("Only a staged variant can be approved.");
-    const approvedEvidence = evidenceForVariant(state);
-    const approvedDigest = digestApprovalPayload({ target: state.variant.productIdentity, copy: state.variant, evidence: approvedEvidence });
+  async recordVisibleApproval() {
+    const candidate = state;
+    if (candidate.variant.status !== "staged") throw new Error("Only a staged variant can be approved.");
+    const approvedEvidence = evidenceForVariant(candidate);
+    const approvedDigest = await digestApprovalPayload({ target: candidate.variant.productIdentity, copy: candidate.variant, evidence: approvedEvidence });
+    assertWorkspaceUnchanged(candidate, "Approval");
     const approvedAt = new Date().toISOString();
     const approval: ApprovalEnvelope = {
-      contractVersion: state.variant.contractVersion,
+      contractVersion: candidate.variant.contractVersion,
       assurance: "demo_ui_gesture",
       principalId: null,
-      target: state.variant.productIdentity,
+      target: candidate.variant.productIdentity,
       payloadDigest: approvedDigest,
-      evidenceIds: [...state.variant.evidenceIds],
+      evidenceIds: [...candidate.variant.evidenceIds],
       policyVersion: "conversion-lab.demo-approval.v1",
       approvedAt,
       expiresAt: null,
@@ -229,19 +237,23 @@ export const appStore = {
       activities: addActivity(current, "Browser user", "Visible approval recorded", `Browser UI gesture bound to ${approvedDigest}; this credential-free demo does not authenticate the actor.`),
     })).variant;
   },
-  publishVariant(actor: Activity["actor"] = "Agent") {
-    const approvedEvidence = evidenceForVariant(state);
-    const currentDigest = digestApprovalPayload({ target: state.variant.productIdentity, copy: state.variant, evidence: approvedEvidence });
-    if (state.variant.status !== "approved" || !state.variant.approval || state.variant.approvedDigest !== currentDigest) {
+  async publishVariant(actor: Activity["actor"] = "Agent") {
+    const candidate = state;
+    const approvedEvidence = evidenceForVariant(candidate);
+    const currentDigest = await digestApprovalPayload({ target: candidate.variant.productIdentity, copy: candidate.variant, evidence: approvedEvidence });
+    assertWorkspaceUnchanged(candidate, "Publication");
+    if (candidate.variant.status !== "approved" || !candidate.variant.approval || candidate.variant.approvedDigest !== currentDigest) {
       throw new Error("Publication blocked: this exact variant does not have current digest-bound approval state.");
     }
-    const representation = representationFor(state, currentDigest);
-    assertApprovalBinding({ approval: state.variant.approval, representation, evidence: approvedEvidence });
-    const updatePreview = previewShopifyProductUpdate({
-      approval: state.variant.approval,
+    const representation = representationFor(candidate, currentDigest);
+    await assertApprovalBinding({ approval: candidate.variant.approval, representation, evidence: approvedEvidence });
+    assertWorkspaceUnchanged(candidate, "Publication");
+    const updatePreview = await previewShopifyProductUpdate({
+      approval: candidate.variant.approval,
       representation,
       evidence: approvedEvidence,
     });
+    assertWorkspaceUnchanged(candidate, "Publication");
     return update((current) => ({
       ...current,
       variant: { ...current.variant, status: "published", publishedAt: new Date().toISOString() },
@@ -249,23 +261,26 @@ export const appStore = {
       activities: addActivity(current, actor, "Shopify preview prepared", "The approved copy is visible in the demo storefront and mapped to a blocked Shopify Admin update preview; no live write occurred."),
     })).variant;
   },
-  prepareAds(actor: Activity["actor"] = "Agent") {
-    const approvedEvidence = evidenceForVariant(state);
-    const currentDigest = digestApprovalPayload({ target: state.variant.productIdentity, copy: state.variant, evidence: approvedEvidence });
-    if (state.variant.status !== "published" || !state.variant.approval || state.variant.approvedDigest !== currentDigest) {
+  async prepareAds(actor: Activity["actor"] = "Agent") {
+    const candidate = state;
+    const approvedEvidence = evidenceForVariant(candidate);
+    const currentDigest = await digestApprovalPayload({ target: candidate.variant.productIdentity, copy: candidate.variant, evidence: approvedEvidence });
+    assertWorkspaceUnchanged(candidate, "Ads preparation");
+    if (candidate.variant.status !== "published" || !candidate.variant.approval || candidate.variant.approvedDigest !== currentDigest) {
       throw new Error("Ads preparation blocked: publish the exact digest-approved variant first.");
     }
-    assertApprovalBinding({ approval: state.variant.approval, representation: representationFor(state, currentDigest), evidence: approvedEvidence });
-    const copy = state.variant;
+    await assertApprovalBinding({ approval: candidate.variant.approval, representation: representationFor(candidate, currentDigest), evidence: approvedEvidence });
+    assertWorkspaceUnchanged(candidate, "Ads preparation");
+    const copy = candidate.variant;
     const feed: OpenAIProductFeedRow = {
-      id: state.product.sku,
+      id: candidate.product.sku,
       title: copy.title,
       description: copy.description,
-      price: `${state.product.price}.00 GBP`,
-      availability: state.product.inventory > 0 ? "in_stock" : "out_of_stock",
-      link: `https://demo.invalid/products/${state.product.handle}`,
+      price: `${candidate.product.price}.00 GBP`,
+      availability: candidate.product.inventory > 0 ? "in_stock" : "out_of_stock",
+      link: `https://demo.invalid/products/${candidate.product.handle}`,
       image_link: "https://demo.invalid/commuter-pack.png",
-      brand: state.product.brand,
+      brand: candidate.product.brand,
       identifier_exists: "no",
       is_ads_eligible: true,
     };

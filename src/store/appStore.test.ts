@@ -25,23 +25,23 @@ describe("demo lifecycle boundary", () => {
     });
   });
 
-  it("blocks publication before exact digest-bound approval state", () => {
-    expect(() => appStore.publishVariant("Agent")).toThrow(/approval/i);
+  it("blocks publication before exact digest-bound approval state", async () => {
+    await expect(appStore.publishVariant("Agent")).rejects.toThrow(/approval/i);
   });
 
-  it("supports the draft → test → stage → approve → publish lifecycle", () => {
+  it("supports the draft → test → stage → approve → publish lifecycle", async () => {
     appStore.generateVariant("Agent");
     expect(appStore.runEvaluation("Agent").score).toBe(8);
     expect(appStore.stageVariant("Agent").status).toBe("staged");
-    const approved = appStore.recordVisibleApproval();
-    expect(approved.approvedDigest).toMatch(/^fnv1a-/);
+    const approved = await appStore.recordVisibleApproval();
+    expect(approved.approvedDigest).toMatch(/^sha256-v1-[a-f0-9]{64}$/);
     expect(approved.approval).toMatchObject({
       target: approved.productIdentity,
       payloadDigest: approved.approvedDigest,
       evidenceIds: approved.evidenceIds,
       assurance: "demo_ui_gesture",
     });
-    const published = appStore.publishVariant("Agent");
+    const published = await appStore.publishVariant("Agent");
     expect(published.status).toBe("published");
     expect(appStore.getState().commerce.updatePreview).toMatchObject({
       operation: "update_product",
@@ -55,14 +55,14 @@ describe("demo lifecycle boundary", () => {
     });
   });
 
-  it("prepares paid media only as a paused, zero-authority projection", () => {
-    expect(() => appStore.prepareAds("Agent")).toThrow(/approved variant/i);
+  it("prepares paid media only as a paused, zero-authority projection", async () => {
+    await expect(appStore.prepareAds("Agent")).rejects.toThrow(/approved variant/i);
     appStore.generateVariant("Agent");
     appStore.runEvaluation("Agent");
     appStore.stageVariant("Agent");
-    appStore.recordVisibleApproval();
-    appStore.publishVariant("Agent");
-    const packageResult = appStore.prepareAds("Agent");
+    await appStore.recordVisibleApproval();
+    await appStore.publishVariant("Agent");
+    const packageResult = await appStore.prepareAds("Agent");
     expect(packageResult.campaignStatus).toBe("PAUSED");
     expect(packageResult.disclaimer).toMatch(/No Ads API call/);
     expect(packageResult.feed).toMatchObject({ identifier_exists: "no", is_ads_eligible: true });
@@ -70,14 +70,14 @@ describe("demo lifecycle boundary", () => {
     expect(packageResult.validation?.unverified).toContain("The row is accepted during OpenAI feed processing");
   });
 
-  it("resets every mutable workflow surface to the canonical demo baseline", () => {
+  it("resets every mutable workflow surface to the canonical demo baseline", async () => {
     appStore.setWebmcpAvailable(true);
     appStore.generateVariant("Agent");
     appStore.runEvaluation("Agent");
     appStore.stageVariant("Agent");
-    appStore.recordVisibleApproval();
-    appStore.publishVariant("Agent");
-    appStore.prepareAds("Agent");
+    await appStore.recordVisibleApproval();
+    await appStore.publishVariant("Agent");
+    await appStore.prepareAds("Agent");
     appStore.updateCart(3, "Agent");
     appStore.setSurface("storefront");
 
@@ -104,8 +104,8 @@ describe("demo lifecycle boundary", () => {
     expect(resetState.webmcpAvailable).toBe(true);
     expect(resetState.activities).toHaveLength(1);
     expect(resetState.activities[0]).toMatchObject({ actor: "Browser user", action: "Demo reset" });
-    expect(() => appStore.publishVariant("Agent")).toThrow(/approval/i);
-    expect(() => appStore.prepareAds("Agent")).toThrow(/approved variant/i);
+    await expect(appStore.publishVariant("Agent")).rejects.toThrow(/approval/i);
+    await expect(appStore.prepareAds("Agent")).rejects.toThrow(/approved variant/i);
   });
 
   it("is semantically idempotent when the browser user resets repeatedly", () => {

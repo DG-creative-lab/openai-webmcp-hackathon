@@ -229,7 +229,7 @@ export async function registerWebMCPTools(): Promise<boolean> {
       inputSchema: emptySchema,
       annotations: stateChangeAnnotations,
       execute: noInput(async () => {
-        const variant = appStore.publishVariant("Agent");
+        const variant = await appStore.publishVariant("Agent");
         return success(effects.publish, {
           variant,
           shopifyUpdatePreview: appStore.getState().commerce.updatePreview,
@@ -244,7 +244,7 @@ export async function registerWebMCPTools(): Promise<boolean> {
       inputSchema: emptySchema,
       annotations: stateChangeAnnotations,
       execute: noInput(async () => success(effects.paid, {
-        adsPackage: appStore.prepareAds("Agent"),
+        adsPackage: await appStore.prepareAds("Agent"),
         liveExternalWrite: false,
         projectedSpend: "GBP 0",
       }, "Use verified product search for the shopper need, then set the visible demo cart quantity.")),

@@ -175,14 +175,14 @@ function Studio() {
   const isPublished = state.variant.status === "published";
   const isComplete = state.adsPackage.status === "ready" && state.cartQuantity > 0;
 
-  const runPrimaryAction = () => {
+  const runPrimaryAction = async () => {
     try {
       if (state.variant.status === "baseline") appStore.generateVariant("Browser user");
       else if (!state.variantEvaluation) appStore.runEvaluation("Browser user");
       else if (canStage) appStore.stageVariant("Browser user");
-      else if (canApprove) appStore.recordVisibleApproval();
-      else if (canPublish) appStore.publishVariant("Browser user");
-      else if (state.adsPackage.status !== "ready") appStore.prepareAds("Browser user");
+      else if (canApprove) await appStore.recordVisibleApproval();
+      else if (canPublish) await appStore.publishVariant("Browser user");
+      else if (state.adsPackage.status !== "ready") await appStore.prepareAds("Browser user");
       else appStore.setSurface("storefront");
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "The action could not be completed.");

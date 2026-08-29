@@ -11,34 +11,57 @@ function sameIdentity(left: Readonly<CommerceIdentity>, right: Readonly<Commerce
   return left.provider === right.provider && left.storeId === right.storeId && left.productId === right.productId;
 }
 
+function canonicalIdentity(identity: Readonly<CommerceIdentity>) {
+  return { provider: identity.provider, storeId: identity.storeId, productId: identity.productId };
+}
+
+function isValidObservedAt(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) return false;
+  const milliseconds = Date.parse(value);
+  if (!Number.isFinite(milliseconds)) return false;
+  const canonical = value.includes(".")
+    ? value.replace(/\.(\d{1,3})Z$/, (_match, fraction: string) => `.${fraction.padEnd(3, "0")}Z`)
+    : value.replace(/Z$/, ".000Z");
+  return new Date(milliseconds).toISOString() === canonical;
+}
+
+function hasValidProvenance(record: EvidenceRecord): boolean {
+  return Boolean(record.provenance.source && record.provenance.reference)
+    && (record.provenance.freshness === "fixture" || record.provenance.freshness === "live")
+    && isValidObservedAt(record.provenance.observedAt);
+}
+
 export function isEvidenceAuthoritativeForTarget(record: EvidenceRecord, target: Readonly<CommerceIdentity>): boolean {
   return record.contractVersion === COMMERCE_CONTRACT_VERSION
     && sameIdentity(record.productIdentity, target)
     && record.verified
-    && Boolean(record.provenance.source && record.provenance.reference && record.provenance.observedAt);
+    && hasValidProvenance(record);
 }
 
 function evidenceAuthority(record: EvidenceRecord) {
   return {
     contractVersion: record.contractVersion,
-    productIdentity: record.productIdentity,
+    productIdentity: canonicalIdentity(record.productIdentity),
     id: record.id,
     label: record.label,
     value: record.value,
     source: record.source,
     verified: record.verified,
     tags: [...record.tags].sort(),
-    provenance: record.provenance,
+    provenance: {
+      source: record.provenance.source,
+      reference: record.provenance.reference,
+      observedAt: record.provenance.observedAt,
+      freshness: record.provenance.freshness,
+    },
   };
 }
 
-function hash(value: string): string {
-  let result = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    result ^= value.charCodeAt(index);
-    result = Math.imul(result, 16777619);
-  }
-  return `fnv1a-${(result >>> 0).toString(16).padStart(8, "0")}`;
+async function hash(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  const hex = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `sha256-v1-${hex}`;
 }
 
 export function assertEvidenceAuthority(
@@ -67,20 +90,27 @@ export function assertEvidenceAuthority(
     if (!record.verified) {
       throw new Error(`Approval blocked: evidence ${record.id} is not verified.`);
     }
-    if (!record.provenance.source || !record.provenance.reference || !record.provenance.observedAt) {
+    if (!record.provenance.source || !record.provenance.reference) {
       throw new Error(`Approval blocked: evidence ${record.id} is missing provenance.`);
+    }
+    if (record.provenance.freshness !== "fixture" && record.provenance.freshness !== "live") {
+      throw new Error(`Approval blocked: evidence ${record.id} has invalid freshness.`);
+    }
+    if (!isValidObservedAt(record.provenance.observedAt)) {
+      throw new Error(`Approval blocked: evidence ${record.id} has an invalid observedAt timestamp.`);
     }
   }
 }
 
-export function digestApprovalPayload(input: {
+export async function digestApprovalPayload(input: {
   target: Readonly<CommerceIdentity>;
   copy: Readonly<CommerceCopy> & { readonly bullets: readonly string[] };
   evidence: readonly EvidenceRecord[];
-}): string {
+}): Promise<string> {
   const canonical = {
+    digestVersion: "sha256-v1",
     contractVersion: COMMERCE_CONTRACT_VERSION,
-    target: input.target,
+    target: canonicalIdentity(input.target),
     copy: {
       title: input.copy.title,
       description: input.copy.description,
@@ -93,11 +123,11 @@ export function digestApprovalPayload(input: {
   return hash(JSON.stringify(canonical));
 }
 
-export function assertApprovalBinding(input: {
+export async function assertApprovalBinding(input: {
   approval: Readonly<ApprovalEnvelope>;
   representation: Readonly<RepresentationVariant>;
   evidence: readonly EvidenceRecord[];
-}): string {
+}): Promise<string> {
   const { approval, representation, evidence } = input;
   if (approval.contractVersion !== COMMERCE_CONTRACT_VERSION || representation.contractVersion !== COMMERCE_CONTRACT_VERSION) {
     throw new Error("Approval blocked: unsupported commerce contract version.");
@@ -109,7 +139,7 @@ export function assertApprovalBinding(input: {
     throw new Error("Approval blocked: the approval and representation use different evidence sets.");
   }
   assertEvidenceAuthority(evidence, approval.target, approval.evidenceIds);
-  const expectedDigest = digestApprovalPayload({ target: approval.target, copy: representation.copy, evidence });
+  const expectedDigest = await digestApprovalPayload({ target: approval.target, copy: representation.copy, evidence });
   if (approval.payloadDigest !== expectedDigest || representation.payloadDigest !== expectedDigest) {
     throw new Error("Approval blocked: target, copy, evidence provenance, or payload digest changed after approval.");
   }

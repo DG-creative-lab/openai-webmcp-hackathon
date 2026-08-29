@@ -4,11 +4,11 @@ import { COMMERCE_CONTRACT_VERSION, type ApprovalEnvelope, type CommerceCopy, ty
 import { createFieldworkFixtureSnapshot } from "./fieldworkFixture";
 import { previewShopifyProductRead, previewShopifyProductUpdate, SHOPIFY_ADMIN_API_VERSION } from "./shopifyAdminPreview";
 
-function approvedBinding(copy: CommerceCopy = { title: "Approved title", description: "Approved description", bullets: ["Approved evidence"] }) {
+async function approvedBinding(copy: CommerceCopy = { title: "Approved title", description: "Approved description", bullets: ["Approved evidence"] }) {
   const snapshot = createFieldworkFixtureSnapshot();
   const target = snapshot.product.identity;
   const evidenceIds = snapshot.evidence.map((record) => record.id);
-  const payloadDigest = digestApprovalPayload({ target, copy, evidence: snapshot.evidence });
+  const payloadDigest = await digestApprovalPayload({ target, copy, evidence: snapshot.evidence });
   const approval: ApprovalEnvelope = {
     contractVersion: COMMERCE_CONTRACT_VERSION,
     assurance: "demo_ui_gesture",
@@ -72,9 +72,9 @@ describe("versioned commerce adapter spine", () => {
     expect(JSON.stringify(preview)).not.toMatch(/access[_-]?token|secret|authorization/i);
   });
 
-  it("recomputes and binds an update preview to the exact approval, product, copy, and evidence", () => {
-    const binding = approvedBinding();
-    const preview = previewShopifyProductUpdate(binding);
+  it("recomputes and binds an update preview to the exact approval, product, copy, and evidence", async () => {
+    const binding = await approvedBinding();
+    const preview = await previewShopifyProductUpdate(binding);
     expect(preview).toMatchObject({
       operation: "update_product",
       payloadDigest: binding.approval.payloadDigest,
@@ -102,78 +102,140 @@ describe("versioned commerce adapter spine", () => {
     expect(previewShopifyProductRead(`${label}.myshopify.com`, "gid://shopify/Product/108828309").target.storeId).toBe(`${label}.myshopify.com`);
   });
 
-  it("rejects cross-product and changed-copy digest reuse at the adapter boundary", () => {
-    const binding = approvedBinding();
+  it("rejects cross-product and changed-copy digest reuse at the adapter boundary", async () => {
+    const binding = await approvedBinding();
     const otherTarget = { ...binding.representation.productIdentity, productId: "gid://shopify/Product/999" };
-    expect(() => previewShopifyProductUpdate({
+    await expect(previewShopifyProductUpdate({
       ...binding,
       representation: { ...binding.representation, productIdentity: otherTarget },
-    })).toThrow(/different products/i);
-    expect(() => previewShopifyProductUpdate({
+    })).rejects.toThrow(/different products/i);
+    await expect(previewShopifyProductUpdate({
       ...binding,
       representation: { ...binding.representation, copy: { ...binding.representation.copy, title: "Unapproved title" } },
-    })).toThrow(/changed after approval/i);
+    })).rejects.toThrow(/changed after approval/i);
   });
 
-  it("rejects missing, wrong-product, or changed-provenance evidence at the adapter boundary", () => {
-    const binding = approvedBinding();
-    expect(() => previewShopifyProductUpdate({ ...binding, evidence: binding.evidence.slice(1) })).toThrow(/complete approved evidence set/i);
-    expect(() => previewShopifyProductUpdate({
+  it("uses versioned SHA-256 so the known FNV-1a collision cannot reuse approval", async () => {
+    const firstCopy = { title: "Candidate pju3ec-1uwi", description: "Approved description", bullets: ["Approved evidence"] };
+    const secondCopy = { ...firstCopy, title: "Candidate 16stnjm-3ikt" };
+    const binding = await approvedBinding(firstCopy);
+    const secondDigest = await digestApprovalPayload({
+      target: binding.approval.target,
+      copy: secondCopy,
+      evidence: binding.evidence,
+    });
+
+    expect(binding.approval.payloadDigest).toMatch(/^sha256-v1-[a-f0-9]{64}$/);
+    expect(secondDigest).toMatch(/^sha256-v1-[a-f0-9]{64}$/);
+    expect(secondDigest).not.toBe(binding.approval.payloadDigest);
+    await expect(previewShopifyProductUpdate({
+      ...binding,
+      representation: { ...binding.representation, copy: secondCopy },
+    })).rejects.toThrow(/changed after approval/i);
+  });
+
+  it("rejects missing, wrong-product, or changed-provenance evidence at the adapter boundary", async () => {
+    const binding = await approvedBinding();
+    await expect(previewShopifyProductUpdate({ ...binding, evidence: binding.evidence.slice(1) })).rejects.toThrow(/complete approved evidence set/i);
+    await expect(previewShopifyProductUpdate({
       ...binding,
       evidence: binding.evidence.map((record, index) => index === 0
         ? { ...record, productIdentity: { ...record.productIdentity, productId: "gid://shopify/Product/999" } }
         : record),
-    })).toThrow(/different product target/i);
-    expect(() => previewShopifyProductUpdate({
+    })).rejects.toThrow(/different product target/i);
+    await expect(previewShopifyProductUpdate({
       ...binding,
       evidence: binding.evidence.map((record, index) => index === 0
         ? { ...record, provenance: { ...record.provenance, observedAt: "2026-08-29T09:00:00.000Z" } }
         : record),
-    })).toThrow(/changed after approval/i);
+    })).rejects.toThrow(/changed after approval/i);
   });
 
-  it("rejects unsupported contracts and mismatched representation evidence", () => {
-    const binding = approvedBinding();
-    expect(() => previewShopifyProductUpdate({
+  it("rejects unsupported contracts and mismatched representation evidence", async () => {
+    const binding = await approvedBinding();
+    await expect(previewShopifyProductUpdate({
       ...binding,
       approval: { ...binding.approval, contractVersion: "legacy" as never },
-    })).toThrow(/unsupported commerce contract/i);
-    expect(() => previewShopifyProductUpdate({
+    })).rejects.toThrow(/unsupported commerce contract/i);
+    await expect(previewShopifyProductUpdate({
       ...binding,
       representation: { ...binding.representation, evidenceIds: binding.representation.evidenceIds.slice(1) },
-    })).toThrow(/different evidence sets/i);
-    expect(() => previewShopifyProductUpdate({
+    })).rejects.toThrow(/different evidence sets/i);
+    await expect(previewShopifyProductUpdate({
       ...binding,
       approval: { ...binding.approval, evidenceIds: [...binding.approval.evidenceIds, binding.approval.evidenceIds[0]] },
       representation: { ...binding.representation, evidenceIds: [...binding.representation.evidenceIds, binding.representation.evidenceIds[0]] },
-    })).toThrow(/unique/i);
-    const emptyDigest = digestApprovalPayload({ target: binding.approval.target, copy: binding.representation.copy, evidence: [] });
-    expect(() => previewShopifyProductUpdate({
+    })).rejects.toThrow(/unique/i);
+    const emptyDigest = await digestApprovalPayload({ target: binding.approval.target, copy: binding.representation.copy, evidence: [] });
+    await expect(previewShopifyProductUpdate({
       approval: { ...binding.approval, evidenceIds: [], payloadDigest: emptyDigest },
       representation: { ...binding.representation, evidenceIds: [], payloadDigest: emptyDigest },
       evidence: [],
-    })).toThrow(/at least one verified evidence/i);
+    })).rejects.toThrow(/at least one verified evidence/i);
   });
 
-  it("rejects unverified, unversioned, or provenance-free approved evidence", () => {
-    const binding = approvedBinding();
+  it("rejects unverified, unversioned, or provenance-free approved evidence", async () => {
+    const binding = await approvedBinding();
     const replaceFirst = (replacement: Partial<EvidenceRecord>) => binding.evidence.map((record, index) => index === 0 ? { ...record, ...replacement } : record);
-    expect(() => previewShopifyProductUpdate({ ...binding, evidence: replaceFirst({ verified: false }) })).toThrow(/not verified/i);
-    expect(() => previewShopifyProductUpdate({ ...binding, evidence: replaceFirst({ contractVersion: "legacy" as never }) })).toThrow(/unsupported contract version/i);
-    expect(() => previewShopifyProductUpdate({
+    await expect(previewShopifyProductUpdate({ ...binding, evidence: replaceFirst({ verified: false }) })).rejects.toThrow(/not verified/i);
+    await expect(previewShopifyProductUpdate({ ...binding, evidence: replaceFirst({ contractVersion: "legacy" as never }) })).rejects.toThrow(/unsupported contract version/i);
+    await expect(previewShopifyProductUpdate({
+      ...binding,
+      evidence: replaceFirst({ provenance: { ...binding.evidence[0].provenance, source: "" } }),
+    })).rejects.toThrow(/missing provenance/i);
+    await expect(previewShopifyProductUpdate({
       ...binding,
       evidence: replaceFirst({ provenance: { ...binding.evidence[0].provenance, observedAt: "" } }),
-    })).toThrow(/missing provenance/i);
+    })).rejects.toThrow(/invalid observedAt timestamp/i);
   });
 
-  it("rejects a non-Shopify approval target or complete-but-empty copy", () => {
-    const binding = approvedBinding();
-    expect(() => previewShopifyProductUpdate({
+  it("rejects self-consistently rehashed evidence with missing freshness or an impossible timestamp", async () => {
+    const binding = await approvedBinding();
+    const assertInvalidProvenance = async (evidence: EvidenceRecord[], expected: RegExp) => {
+      const payloadDigest = await digestApprovalPayload({ target: binding.approval.target, copy: binding.representation.copy, evidence });
+      await expect(previewShopifyProductUpdate({
+        approval: { ...binding.approval, payloadDigest },
+        representation: { ...binding.representation, payloadDigest },
+        evidence,
+      })).rejects.toThrow(expected);
+    };
+
+    const withoutFreshness = binding.evidence.map((record, index) => {
+      if (index !== 0) return record;
+      const provenance: Partial<EvidenceRecord["provenance"]> = { ...record.provenance };
+      delete provenance.freshness;
+      return { ...record, provenance };
+    }) as EvidenceRecord[];
+    await assertInvalidProvenance(withoutFreshness, /invalid freshness/i);
+
+    const impossibleObservedAt = binding.evidence.map((record, index) => index === 0
+      ? { ...record, provenance: { ...record.provenance, observedAt: "2099-02-30T00:00:00.000Z" } }
+      : record);
+    await assertInvalidProvenance(impossibleObservedAt, /invalid observedAt timestamp/i);
+  });
+
+  it("accepts live evidence with a valid UTC timestamp without fractional seconds", async () => {
+    const binding = await approvedBinding();
+    const evidence = binding.evidence.map((record) => ({
+      ...record,
+      provenance: { ...record.provenance, freshness: "live" as const, observedAt: "2026-08-28T00:00:00Z" },
+    }));
+    const payloadDigest = await digestApprovalPayload({ target: binding.approval.target, copy: binding.representation.copy, evidence });
+    await expect(previewShopifyProductUpdate({
+      approval: { ...binding.approval, payloadDigest },
+      representation: { ...binding.representation, payloadDigest },
+      evidence,
+    })).resolves.toMatchObject({ status: "preview_ready", payloadDigest });
+  });
+
+  it("rejects a non-Shopify approval target or complete-but-empty copy", async () => {
+    const binding = await approvedBinding();
+    await expect(previewShopifyProductUpdate({
       ...binding,
       approval: { ...binding.approval, target: { ...binding.approval.target, provider: "fixture" } },
-    })).toThrow(/Shopify product identity/i);
+    })).rejects.toThrow(/Shopify product identity/i);
 
-    const blank = approvedBinding({ title: " ", description: "Description", bullets: [] });
-    expect(() => previewShopifyProductUpdate(blank)).toThrow(/non-empty/i);
+    const blank = await approvedBinding({ title: " ", description: "Description", bullets: [] });
+    await expect(previewShopifyProductUpdate(blank)).rejects.toThrow(/non-empty/i);
   });
 });
