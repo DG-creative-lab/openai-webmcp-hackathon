@@ -96,4 +96,26 @@ describe("OpenAI product-feed local schema validator", () => {
       errors: expect.arrayContaining(["conflict:identifier_exists", "format:gtin", "format:price", "format:link"]),
     });
   });
+
+  it("rejects overlong core fields and credential-bearing product URLs", () => {
+    expect(validateOpenAIProductFeedRow({
+      ...validRow,
+      id: "a".repeat(101),
+      title: "t".repeat(151),
+      description: "d".repeat(5_001),
+      brand: "b".repeat(71),
+      link: "https://user:secret@merchant.example/product",
+      image_link: "https://user:secret@merchant.example/image.png",
+    })).toMatchObject({
+      valid: false,
+      errors: expect.arrayContaining([
+        "length:id",
+        "length:title",
+        "length:description",
+        "length:brand",
+        "format:link",
+        "format:image_link",
+      ]),
+    });
+  });
 });

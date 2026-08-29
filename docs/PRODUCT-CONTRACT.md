@@ -23,7 +23,7 @@ A judge can watch a generic listing move from 0/8 to 8/8 deterministic buyer-int
 
 - **Shopify:** faithful local projection of product/catalogue and storefront state.
 - **WebMCP:** live page-scoped tools registered through `document.modelContext`.
-- **OpenAI Ads:** product-feed row and paused campaign projection based on the same approved product truth.
+- **OpenAI Ads:** digest-bound Google-compatible CSV feed export and paused campaign projection based on the same approved product truth.
 - **Codex:** agent operator that can discover and invoke the page's site tools while the merchant watches the same workspace.
 
 ## Intentionally deferred

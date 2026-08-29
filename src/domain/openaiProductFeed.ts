@@ -7,7 +7,9 @@ const availabilityRequiringDate = new Set(["preorder", "backorder"]);
 function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
+    return (url.protocol === "http:" || url.protocol === "https:")
+      && !url.username
+      && !url.password;
   } catch {
     return false;
   }
@@ -66,6 +68,10 @@ export function validateOpenAIProductFeedRow(row: Partial<OpenAIProductFeedRow>,
   requiredTextFields.forEach((field) => {
     if (typeof row[field] !== "string" || row[field].trim().length === 0) errors.push(`required:${field}`);
   });
+  if (typeof row.id === "string" && row.id.length > 100) errors.push("length:id");
+  if (typeof row.title === "string" && row.title.length > 150) errors.push("length:title");
+  if (typeof row.description === "string" && row.description.length > 5_000) errors.push("length:description");
+  if (typeof row.brand === "string" && row.brand.length > 70) errors.push("length:brand");
   if (typeof row.price !== "string" || !/^\d+(?:\.\d{2}) [A-Z]{3}$/.test(row.price) || Number.parseFloat(row.price) <= 0) errors.push("format:price");
   if (typeof row.availability !== "string" || !allowedAvailability.has(row.availability)) errors.push("value:availability");
   const availabilityDate = typeof row.availability_date === "string" ? row.availability_date.trim() : "";

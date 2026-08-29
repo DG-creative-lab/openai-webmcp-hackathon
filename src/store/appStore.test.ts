@@ -66,6 +66,15 @@ describe("demo lifecycle boundary", () => {
     expect(packageResult.campaignStatus).toBe("PAUSED");
     expect(packageResult.disclaimer).toMatch(/No Ads API call/);
     expect(packageResult.feed).toMatchObject({ identifier_exists: "no", is_ads_eligible: true });
+    expect(packageResult.feedExport).toMatchObject({
+      format: "google-compatible-csv",
+      filename: "conversion-lab-openai-ads-feed.csv",
+      rowCount: 1,
+      sourcePayloadDigest: appStore.getState().variant.approvedDigest,
+      contentDigest: expect.stringMatching(/^sha256-v1-[a-f0-9]{64}$/),
+      delivery: { transport: "SFTP", requiresAdsManagerFeedConnection: true, advertiserApiUploadSupported: false },
+    });
+    expect(packageResult.feedExport?.contents).toContain("id,title,description,link,image_link");
     expect(packageResult.validation).toMatchObject({ scope: "local_schema", valid: true, errors: [] });
     expect(packageResult.validation?.unverified).toContain("The row is accepted during OpenAI feed processing");
   });
@@ -97,6 +106,7 @@ describe("demo lifecycle boundary", () => {
       status: "not_prepared",
       campaignStatus: "not_created",
       feed: null,
+      feedExport: null,
       validation: null,
       adTemplate: null,
     });

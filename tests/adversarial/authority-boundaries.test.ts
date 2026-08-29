@@ -96,6 +96,7 @@ describe("adversarial authority and lifecycle boundaries", () => {
       status: "not_prepared",
       campaignStatus: "not_created",
       feed: null,
+      feedExport: null,
     });
   });
 
@@ -119,6 +120,20 @@ describe("adversarial authority and lifecycle boundaries", () => {
     expect(() => {
       (approval?.target as { productId: string }).productId = "gid://shopify/Product/999";
     }).toThrow(TypeError);
+  });
+
+  it("keeps the prepared Ads row and downloadable artifact immutable", async () => {
+    await reach("published");
+    await appStore.prepareAds("Agent");
+    const ads = appStore.getState().adsPackage;
+
+    expect(Object.isFrozen(ads.feed)).toBe(true);
+    expect(Object.isFrozen(ads.feedExport)).toBe(true);
+    expect(Object.isFrozen(ads.feedExport?.delivery)).toBe(true);
+    expect(() => {
+      (ads.feedExport as { contents: string }).contents = "hostile replacement";
+    }).toThrow(TypeError);
+    expect(appStore.getState().adsPackage.feedExport?.contents).not.toBe("hostile replacement");
   });
 
   it("fails closed when workspace state changes during asynchronous digest verification", async () => {
@@ -243,6 +258,10 @@ describe("adversarial authority and lifecycle boundaries", () => {
     expect(ads.campaignStatus).toBe("PAUSED");
     expect(ads.disclaimer).toMatch(/No Ads API call|No.*spend/i);
     expect(ads.feed).toMatchObject({ identifier_exists: "no", is_ads_eligible: true });
+    expect(ads.feedExport).toMatchObject({
+      sourcePayloadDigest: appStore.getState().variant.approvedDigest,
+      delivery: { transport: "SFTP", requiresAdsManagerFeedConnection: true, advertiserApiUploadSupported: false },
+    });
     expect(ads.validation).toMatchObject({ scope: "local_schema", valid: true, errors: [] });
   });
 

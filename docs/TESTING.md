@@ -10,7 +10,7 @@ The quality system is deliberately layered. Agents may help discover failure cas
 | Adversarial | `make test-adversarial` | Illegal lifecycle edges, stale authority, hostile runtime values, unsupported claims, prohibited agent capabilities | Seconds |
 | Infrastructure | `make test-infrastructure` | Change-impact mapping and conservative fallback behavior | Seconds |
 | Coverage gate | `make test-coverage` | Unit and adversarial behavior across domain, store, and WebMCP control modules | Seconds |
-| Browser smoke | `make test-smoke` | Real page boot, tool discovery, shared session state, visible approval checkpoint, publication, Ads projection, shopper recommendation and cart | Under a minute |
+| Browser smoke | `make test-smoke` | Real page boot, tool discovery, shared session state, visible approval checkpoint, publication, digest-bound Ads CSV download, shopper recommendation and cart | Under a minute |
 | Deployment smoke | `make test-deployment` | Production Vite output, static assets, and the complete Vercel-shaped browser journey | Under a minute |
 | Complete merge gate | `make test-all` | Diff hygiene, typecheck, coverage thresholds, production build and browser journey | Under a few minutes |
 

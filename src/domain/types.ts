@@ -108,10 +108,27 @@ export interface FeedValidation {
   unverified: string[];
 }
 
+export interface OpenAIAdsFeedExport {
+  format: "google-compatible-csv";
+  filename: "conversion-lab-openai-ads-feed.csv";
+  mediaType: "text/csv;charset=utf-8";
+  encoding: "UTF-8";
+  rowCount: number;
+  contentDigest: string;
+  sourcePayloadDigest: string;
+  contents: string;
+  delivery: {
+    transport: "SFTP";
+    requiresAdsManagerFeedConnection: true;
+    advertiserApiUploadSupported: false;
+  };
+}
+
 export interface AdsPackage {
   status: "not_prepared" | "ready";
   campaignStatus: "not_created" | "PAUSED";
   feed: OpenAIProductFeedRow | null;
+  feedExport: OpenAIAdsFeedExport | null;
   validation: FeedValidation | null;
   adTemplate: { headline: string; description: string } | null;
   disclaimer: string;
