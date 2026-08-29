@@ -83,7 +83,7 @@ function optionalString(value: unknown): string {
 }
 
 function requirePrice(value: unknown): number {
-  if (typeof value !== "string" || !/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) {
+  if (typeof value !== "string" || !/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(value)) {
     throw new Error("Shopify product read failed: the first variant price is missing or invalid.");
   }
   const parsed = Number(value);

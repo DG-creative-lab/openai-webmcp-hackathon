@@ -118,6 +118,32 @@ describe("approval-bound OpenAI Ads feed projection", () => {
     });
   });
 
+  it("uses one owned snapshot when caller inputs mutate during digest verification", async () => {
+    const input = await approvedInput();
+    const approvedDigest = input.approval.payloadDigest;
+    const pending = prepareOpenAIAdsFeedProjection(input);
+    const mutableProduct = input.approval.productSnapshot as {
+      price: number;
+      inventory: number;
+      productUrl: string;
+    };
+    const mutableCopy = input.representation.copy as { title: string };
+
+    mutableProduct.price = 1;
+    mutableProduct.inventory = 0;
+    mutableProduct.productUrl = "https://attacker.example/substituted";
+    mutableCopy.title = "Changed during verification";
+
+    const result = await pending;
+    expect(result.feed).toMatchObject({
+      title: "Approved commuter pack",
+      price: "159.00 GBP",
+      availability: "in_stock",
+      link: "https://conversion-lab-webmcp.vercel.app/",
+    });
+    expect(result.feedExport.sourcePayloadDigest).toBe(approvedDigest);
+  });
+
   it.each([
     ["sku", "SUBSTITUTED-SKU"],
     ["brand", "Substituted Brand"],
@@ -149,5 +175,30 @@ describe("approval-bound OpenAI Ads feed projection", () => {
         productSnapshot: { ...input.approval.productSnapshot, productUrl: "https://user:secret@merchant.example/" },
       },
     })).rejects.toThrow(/snapshot URLs are invalid/i);
+  });
+
+  it("rejects prices that cannot be represented exactly at GBP minor-unit precision", async () => {
+    const input = await approvedInput();
+    await expect(prepareOpenAIAdsFeedProjection({
+      ...input,
+      approval: {
+        ...input.approval,
+        productSnapshot: { ...input.approval.productSnapshot, price: 1.005 },
+      },
+    })).rejects.toThrow(/snapshot price is invalid/i);
+
+    const preciseSnapshot = { ...input.approval.productSnapshot, price: 159.99 };
+    const payloadDigest = await digestApprovalPayload({
+      target: input.approval.target,
+      productSnapshot: preciseSnapshot,
+      copy: input.representation.copy,
+      evidence: input.evidence,
+    });
+    const result = await prepareOpenAIAdsFeedProjection({
+      ...input,
+      approval: { ...input.approval, productSnapshot: preciseSnapshot, payloadDigest },
+      representation: { ...input.representation, payloadDigest },
+    });
+    expect(result.feed.price).toBe("159.99 GBP");
   });
 });

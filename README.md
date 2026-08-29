@@ -39,7 +39,7 @@ Every input schema is narrow and rejects additional properties. Read-only tools 
 ## Authority model
 
 - Site tools may read evidence, draft, evaluate and stage; no approval or reset site tool is registered.
-- The visible browser interface records the demo approval gesture in a deeply frozen envelope bound by a `sha256-v1` Web Crypto digest to the canonical Shopify product target, feed-bearing commercial snapshot (SKU, brand, price, currency, inventory and destination URLs), exact copy, complete runtime-validated evidence content, tags and provenance.
+- The visible browser interface records the demo approval gesture in a deeply frozen envelope bound by a `sha256-v1` Web Crypto digest to the canonical Shopify product target, feed-bearing commercial snapshot (SKU, brand, exact GBP minor-unit price, currency, inventory and destination URLs), exact copy, complete runtime-validated evidence content, tags and provenance. Exported adapter boundaries synchronously capture their own frozen canonical snapshot before digest verification so caller mutation cannot change the later projection.
 - This credential-free demo does not authenticate the browser actor and therefore does not claim enforced human or merchant-only authority. A production Shopify write requires an authenticated merchant grant bound to the same target and digest.
 - Publishing fails if approval is missing or stale.
 - The Ads integration is deliberately a projection: no credential, SFTP upload, external API write, activation or spend path exists in this demo.

@@ -136,6 +136,18 @@ describe("versioned commerce adapter spine", () => {
     })).rejects.toThrow(/changed after approval/i);
   });
 
+  it("uses the captured approved copy when caller-owned inputs mutate during verification", async () => {
+    const binding = await approvedBinding();
+    const pending = previewShopifyProductUpdate(binding);
+    (binding.representation.copy as { title: string }).title = "Changed during verification";
+    (binding.approval.productSnapshot as { price: number }).price = 1;
+
+    await expect(pending).resolves.toMatchObject({
+      payloadDigest: binding.approval.payloadDigest,
+      payload: { variables: { product: { title: "Approved title" } } },
+    });
+  });
+
   it("uses versioned SHA-256 so the known FNV-1a collision cannot reuse approval", async () => {
     const firstCopy = { title: "Candidate pju3ec-1uwi", description: "Approved description", bullets: ["Approved evidence"] };
     const secondCopy = { ...firstCopy, title: "Candidate 16stnjm-3ikt" };

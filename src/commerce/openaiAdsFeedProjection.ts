@@ -1,4 +1,4 @@
-import { assertApprovalBinding } from "./approvalBinding";
+import { verifyApprovalBinding } from "./approvalBinding";
 import type { ApprovalEnvelope, EvidenceRecord, RepresentationVariant } from "./contracts";
 import { serializeOpenAIAdsFeedRows } from "../domain/openaiAdsFeedExport";
 import { validateOpenAIProductFeedRow } from "../domain/openaiProductFeed";
@@ -10,13 +10,15 @@ export async function prepareOpenAIAdsFeedProjection(input: {
   evidence: readonly EvidenceRecord[];
   now?: Date;
 }): Promise<{ feed: OpenAIProductFeedRow; validation: FeedValidation; feedExport: OpenAIAdsFeedExport }> {
-  const approvedDigest = await assertApprovalBinding(input);
-  const product = input.approval.productSnapshot;
+  const verified = await verifyApprovalBinding(input);
+  const product = verified.approval.productSnapshot;
+  const minorUnits = Math.round(product.price * 100);
+  const formattedPrice = `${Math.floor(minorUnits / 100)}.${String(minorUnits % 100).padStart(2, "0")} ${product.currency}`;
   const feed: OpenAIProductFeedRow = {
     id: product.sku,
-    title: input.representation.copy.title,
-    description: input.representation.copy.description,
-    price: `${product.price.toFixed(2)} ${product.currency}`,
+    title: verified.representation.copy.title,
+    description: verified.representation.copy.description,
+    price: formattedPrice,
     availability: product.inventory > 0 ? "in_stock" : "out_of_stock",
     link: product.productUrl,
     image_link: product.imageUrl,
@@ -32,6 +34,6 @@ export async function prepareOpenAIAdsFeedProjection(input: {
   return {
     feed,
     validation,
-    feedExport: { ...serialized, sourcePayloadDigest: approvedDigest },
+    feedExport: { ...serialized, sourcePayloadDigest: verified.payloadDigest },
   };
 }
