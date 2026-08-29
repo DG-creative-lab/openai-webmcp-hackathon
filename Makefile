@@ -1,4 +1,4 @@
-.PHONY: help install verify-diff check build test test-unit test-adversarial test-infrastructure test-coverage test-smoke test-fast test-all test-affected shopify-read ci
+.PHONY: help install verify-diff check build test test-unit test-adversarial test-infrastructure test-coverage test-smoke test-deployment test-fast test-all test-affected shopify-read ci
 
 BASE_REF ?= origin/main
 
@@ -13,6 +13,7 @@ help:
 	@echo ""
 	@echo "System confidence:"
 	@echo "  make test-smoke         Browser-level agent-assisted journey"
+	@echo "  make test-deployment    Production Vercel-shaped build and browser journey"
 	@echo "  make test-coverage      Unit + adversarial suite with scoped thresholds"
 	@echo "  make test-all           Complete merge gate"
 	@echo "  make test-affected      Select tests from changes vs BASE_REF=$(BASE_REF)"
@@ -47,9 +48,13 @@ test-coverage:
 test-smoke:
 	pnpm test:smoke
 
+test-deployment:
+	pnpm build
+	pnpm test:deployment
+
 test-fast: verify-diff check test-unit test-infrastructure
 
-test-all: verify-diff check test-infrastructure test-coverage build test-smoke
+test-all: verify-diff check test-infrastructure test-coverage build test-smoke test-deployment
 
 test-affected:
 	node scripts/test-affected.mjs --base "$(BASE_REF)"

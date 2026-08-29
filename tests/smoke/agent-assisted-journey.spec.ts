@@ -32,10 +32,16 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("an agent discovers the tools and completes the journey around the visible approval checkpoint", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("./");
   await expect(page.getByText("9 site tools · 3 read / 6 state")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Start with one agent prompt" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Modular Commuter Pack" })).toBeVisible();
+  const productImage = page.getByAltText("Black waterproof commuter pack mounted on a bicycle rack in the rain");
+  await expect(productImage).toBeVisible();
+  await expect.poll(() => productImage.evaluate((image) => {
+    const element = image as HTMLImageElement;
+    return element.complete && element.naturalWidth > 0;
+  })).toBe(true);
 
   const toolNames = await page.evaluate(() => (window as unknown as {
     __webmcpTools: Array<{ name: string }>;
