@@ -47,7 +47,7 @@ Every input schema is narrow and rejects additional properties. Read-only tools 
 
 ## Run locally
 
-Requires Node.js 20+ and pnpm.
+Requires Node.js `^20.19.0` or `>=22.12.0`, plus pnpm.
 
 ```bash
 pnpm install

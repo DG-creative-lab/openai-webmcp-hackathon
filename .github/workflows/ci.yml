@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   node-20-compatibility:
-    name: Node 20 compatibility
+    name: Node 20.19 compatibility floor
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -27,12 +27,15 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20.19.0
           cache: pnpm
       - name: Install dependencies on the documented runtime floor
         run: pnpm install --frozen-lockfile
-      - name: Verify types and the Shopify schema contract
-        run: pnpm check && pnpm exec vitest run src/commerce/shopifyAdminQueryContract.test.ts
+      - name: Verify the build, types and Shopify schema contract
+        run: |
+          pnpm check
+          pnpm build
+          pnpm exec vitest run src/commerce/shopifyAdminQueryContract.test.ts
 
   merge-gate:
     name: Complete merge gate
