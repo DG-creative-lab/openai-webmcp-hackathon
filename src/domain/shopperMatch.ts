@@ -1,4 +1,6 @@
 import type { Evidence, Product, ShopperConstraint, ShopperMatch } from "./types";
+import type { CommerceIdentity } from "../commerce/contracts";
+import { isEvidenceAuthoritativeForTarget } from "../commerce/approvalBinding";
 
 type Range = { start: number; end: number };
 
@@ -50,11 +52,16 @@ export function evaluateShopperNeed(
   product: Product,
   evidence: Evidence[],
   representedEvidenceIds: ReadonlySet<string>,
+  productIdentity: Readonly<CommerceIdentity>,
 ): ShopperMatch {
   const query = rawQuery.toLowerCase();
   const constraints: ShopperConstraint[] = [];
   const consumed: Range[] = [];
-  const byId = new Map(evidence.map((item) => [item.id, item]));
+  const byId = new Map(
+    evidence
+      .filter((item) => isEvidenceAuthoritativeForTarget(item, productIdentity))
+      .map((item) => [item.id, item]),
+  );
 
   featureRules.forEach((rule) => {
     const negativeRanges = rule.negative ? collectRanges(rule.negative, query) : [];

@@ -8,7 +8,7 @@ describe("shopper constraint evaluation", () => {
   function evaluate(query: string, represented = true) {
     const state = appStore.getState();
     const representedEvidence = new Set(represented ? state.evidence.map((item) => item.id) : []);
-    return evaluateShopperNeed(query, state.product, state.evidence, representedEvidence);
+    return evaluateShopperNeed(query, state.product, state.evidence, representedEvidence, state.commerce.sourceIdentity);
   }
 
   it.each([
@@ -31,6 +31,18 @@ describe("shopper constraint evaluation", () => {
     expect(result.match).toBe(false);
     expect(result.constraints.map((constraint) => constraint.status)).toEqual(["unknown", "unknown"]);
     expect(result.evidence).toEqual([]);
+  });
+
+  it("does not use evidence with missing runtime freshness", () => {
+    const state = appStore.getState();
+    const evidence = state.evidence.map((item) => {
+      if (item.id !== "ev-waterproof") return item;
+      const provenance = { ...item.provenance } as Partial<typeof item.provenance>;
+      delete provenance.freshness;
+      return { ...item, provenance };
+    }) as typeof state.evidence;
+    const result = evaluateShopperNeed("waterproof bag", state.product, evidence, new Set(["ev-waterproof"]), state.commerce.sourceIdentity);
+    expect(result).toMatchObject({ match: false, constraints: [{ status: "unknown" }] });
   });
 
   it("returns a conservative unknown when no material constraint can be parsed", () => {

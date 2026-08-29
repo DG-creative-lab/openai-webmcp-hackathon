@@ -1,15 +1,11 @@
+import type { ApprovalEnvelope, CommerceContractVersion, CommerceIdentity, EffectReceipt, EvidenceRecord, SourceProvenance } from "../commerce/contracts";
+import type { ShopifyOperationPreview } from "../commerce/shopifyAdminPreview";
+
 export type Surface = "studio" | "storefront";
 export type VariantStatus = "baseline" | "draft" | "staged" | "approved" | "published";
 export type Channel = "shopify-webmcp" | "openai-ads";
 
-export interface Evidence {
-  id: string;
-  label: string;
-  value: string;
-  source: string;
-  verified: boolean;
-  tags: string[];
-}
+export type Evidence = EvidenceRecord;
 
 export interface ProductCopy {
   title: string;
@@ -30,11 +26,14 @@ export interface Product {
 }
 
 export interface Variant extends ProductCopy {
+  contractVersion: CommerceContractVersion;
   id: string;
+  productIdentity: CommerceIdentity;
   status: VariantStatus;
   evidenceIds: string[];
   approvedDigest: string | null;
   approvedAt: string | null;
+  approval: ApprovalEnvelope | null;
   publishedAt: string | null;
 }
 
@@ -118,13 +117,24 @@ export interface AdsPackage {
   disclaimer: string;
 }
 
+export interface CommerceIntegrationState {
+  mode: "fixture" | "shopify";
+  contractVersion: CommerceContractVersion;
+  sourceIdentity: CommerceIdentity;
+  provenance: SourceProvenance;
+  readReceipt: EffectReceipt;
+  readPreview: ShopifyOperationPreview;
+  updatePreview: ShopifyOperationPreview | null;
+}
+
 export interface AppState {
   surface: Surface;
   product: Product;
-  evidence: Evidence[];
+  evidence: EvidenceRecord[];
   variant: Variant;
   baselineEvaluation: Evaluation;
   variantEvaluation: Evaluation | null;
+  commerce: CommerceIntegrationState;
   adsPackage: AdsPackage;
   cartQuantity: number;
   webmcpAvailable: boolean;

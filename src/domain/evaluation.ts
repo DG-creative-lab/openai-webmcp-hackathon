@@ -1,4 +1,6 @@
 import type { Evaluation, Evidence, ProductCopy } from "./types";
+import type { CommerceIdentity } from "../commerce/contracts";
+import { isEvidenceAuthoritativeForTarget } from "../commerce/approvalBinding";
 
 export const buyerIntents = [
   { id: "wet", shortLabel: "Heavy rain", query: "A work bag that keeps a laptop dry in heavy rain", terms: ["ipx6", "waterproof"], evidenceId: "ev-waterproof" },
@@ -11,11 +13,11 @@ export const buyerIntents = [
   { id: "weekend", shortLabel: "24L capacity", query: "One 24-litre bag for commuting and a weekend away", terms: ["24l", "24 litre", "24-liter"], evidenceId: "ev-capacity" },
 ] as const;
 
-export function evaluateCopy(copy: ProductCopy, evidence: Evidence[], label: string): Evaluation {
+export function evaluateCopy(copy: ProductCopy, evidence: Evidence[], label: string, productIdentity: Readonly<CommerceIdentity>): Evaluation {
   const haystack = [copy.title, copy.description, ...copy.bullets].join(" ").toLowerCase();
   const results = buyerIntents.map((intent) => {
     const source = evidence.find((item) => item.id === intent.evidenceId);
-    const matched = Boolean(source?.verified && intent.terms.some((term) => haystack.includes(term)));
+    const matched = Boolean(source && isEvidenceAuthoritativeForTarget(source, productIdentity) && intent.terms.some((term) => haystack.includes(term)));
     return {
       id: intent.id,
       query: intent.query,
@@ -33,19 +35,4 @@ export function evaluateCopy(copy: ProductCopy, evidence: Evidence[], label: str
     results,
     createdAt: new Date().toISOString(),
   };
-}
-
-export function digestVariant(copy: ProductCopy, evidenceIds: string[]): string {
-  const approvedContent: ProductCopy = {
-    title: copy.title,
-    description: copy.description,
-    bullets: [...copy.bullets],
-  };
-  const value = JSON.stringify({ copy: approvedContent, evidenceIds: [...evidenceIds].sort() });
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `fnv1a-${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }

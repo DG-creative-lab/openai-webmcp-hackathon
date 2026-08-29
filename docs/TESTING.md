@@ -13,7 +13,7 @@ The quality system is deliberately layered. Agents may help discover failure cas
 | Browser smoke | `make test-smoke` | Real page boot, tool discovery, shared session state, visible approval checkpoint, publication, Ads projection, shopper recommendation and cart | Under a minute |
 | Complete merge gate | `make test-all` | Diff hygiene, typecheck, coverage thresholds, production build and browser journey | Under a few minutes |
 
-Coverage is intentionally scoped to `src/domain`, `src/store`, and `src/webmcp/registerTools.ts`, where deterministic product and authority logic lives. The current thresholds are 85% statements, functions and lines, and 75% branches. The browser suite supplies behavioral evidence for React composition; these numbers are not presented as whole-system coverage.
+Coverage is intentionally scoped to `src/commerce`, `src/domain`, `src/store`, and `src/webmcp/registerTools.ts`, where deterministic product, adapter and authority logic lives. The current thresholds are 85% statements, functions and lines, and 75% branches. The browser suite supplies behavioral evidence for React composition; these numbers are not presented as whole-system coverage.
 
 ## Change-aware selection
 

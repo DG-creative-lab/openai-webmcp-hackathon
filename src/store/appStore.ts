@@ -1,32 +1,28 @@
-import { digestVariant, evaluateCopy } from "../domain/evaluation";
+import { createFieldworkFixtureSnapshot } from "../commerce/fieldworkFixture";
+import { assertApprovalBinding, assertEvidenceAuthority, digestApprovalPayload } from "../commerce/approvalBinding";
+import { previewShopifyProductRead, previewShopifyProductUpdate } from "../commerce/shopifyAdminPreview";
+import { COMMERCE_CONTRACT_VERSION, type ApprovalEnvelope, type EvidenceRecord, type RepresentationVariant } from "../commerce/contracts";
+import { evaluateCopy } from "../domain/evaluation";
 import { validateOpenAIProductFeedRow } from "../domain/openaiProductFeed";
 import type { Activity, AppState, OpenAIProductFeedRow, ProductCopy, Surface } from "../domain/types";
 
-const evidence = [
-  { id: "ev-waterproof", label: "Weather protection", value: "IPX6 waterproof", source: "Independent spray test · LAB-117", verified: true, tags: ["waterproof", "rain"] },
-  { id: "ev-laptop", label: "Laptop sleeve", value: "Fits up to 16-inch laptop", source: "Product specification · PS-24L", verified: true, tags: ["laptop", "commute"] },
-  { id: "ev-repair", label: "Repair programme", value: "5 years for zips, buckles and seams", source: "Repair policy · RP-05", verified: true, tags: ["repair", "durability"] },
-  { id: "ev-price", label: "Retail price", value: "£159", source: "Shopify price · live", verified: true, tags: ["price"] },
-  { id: "ev-delivery", label: "Dispatch promise", value: "Dispatches today for Friday delivery", source: "Warehouse SLA · live", verified: true, tags: ["delivery"] },
-  { id: "ev-weight", label: "Product weight", value: "1.2kg", source: "Product specification · PS-24L", verified: true, tags: ["weight"] },
-  { id: "ev-rack", label: "Rack attachment", value: "Rack system tested to 12kg", source: "Load test · LAB-104", verified: true, tags: ["bike", "rack"] },
-  { id: "ev-capacity", label: "Capacity", value: "24L", source: "Product specification · PS-24L", verified: true, tags: ["capacity"] },
-];
-
+const commerceSnapshot = createFieldworkFixtureSnapshot();
+const evidence: EvidenceRecord[] = commerceSnapshot.evidence.map((record) => ({
+  ...record,
+  productIdentity: { ...record.productIdentity },
+  tags: [...record.tags],
+  provenance: { ...record.provenance },
+}));
 const product = {
-  id: "gid://shopify/Product/urban-24",
-  sku: "URB-24-BLK",
-  handle: "modular-commuter-24",
-  brand: "Fieldwork Supply",
-  price: 159,
-  currency: "GBP" as const,
-  inventory: 18,
-  image: "/commuter-pack.png",
-  baseline: {
-    title: "Modular Commuter Pack",
-    description: "A versatile technical bag designed for everyday movement through the city.",
-    bullets: ["Flexible carry modes", "Durable construction", "Built for daily use"],
-  },
+  id: commerceSnapshot.product.identity.productId,
+  sku: commerceSnapshot.product.sku,
+  handle: commerceSnapshot.product.handle,
+  brand: commerceSnapshot.product.brand,
+  price: commerceSnapshot.product.price,
+  currency: commerceSnapshot.product.currency,
+  inventory: commerceSnapshot.product.inventory,
+  image: commerceSnapshot.product.image,
+  baseline: { ...commerceSnapshot.product.baseline, bullets: [...commerceSnapshot.product.baseline.bullets] },
 };
 
 const variantCopy: ProductCopy = {
@@ -39,17 +35,20 @@ const variantCopy: ProductCopy = {
   ],
 };
 
-const baselineEvaluation = evaluateCopy(product.baseline, evidence, "Current Shopify copy");
+const baselineEvaluation = evaluateCopy(product.baseline, evidence, "Current Shopify copy", commerceSnapshot.product.identity);
 
 function initialVariant(): AppState["variant"] {
   return {
+    contractVersion: COMMERCE_CONTRACT_VERSION,
     id: "variant-urban-24-v1",
+    productIdentity: { ...commerceSnapshot.product.identity },
     ...product.baseline,
     bullets: [...product.baseline.bullets],
     status: "baseline",
     evidenceIds: evidence.map((item) => item.id),
     approvedDigest: null,
     approvedAt: null,
+    approval: null,
     publishedAt: null,
   };
 }
@@ -62,6 +61,19 @@ function initialAdsPackage(): AppState["adsPackage"] {
     validation: null,
     adTemplate: null,
     disclaimer: "Demo projection only. No Ads API call, campaign activation or spend can occur.",
+  };
+}
+
+function initialCommerce(): AppState["commerce"] {
+  const sourceIdentity = { ...commerceSnapshot.product.identity };
+  return {
+    mode: commerceSnapshot.mode,
+    contractVersion: commerceSnapshot.contractVersion,
+    sourceIdentity,
+    provenance: { ...commerceSnapshot.product.provenance },
+    readReceipt: { ...commerceSnapshot.readReceipt, target: { ...commerceSnapshot.readReceipt.target } },
+    readPreview: previewShopifyProductRead(sourceIdentity.storeId, sourceIdentity.productId),
+    updatePreview: null,
   };
 }
 
@@ -93,13 +105,14 @@ function initialState(webmcpAvailable: boolean, resetByBrowserUser = false): App
     variant: initialVariant(),
     baselineEvaluation,
     variantEvaluation: null,
+    commerce: initialCommerce(),
     adsPackage: initialAdsPackage(),
     cartQuantity: 0,
     webmcpAvailable,
     activities: [
       resetByBrowserUser
         ? activity("Browser user", "Demo reset", "Cleared evaluation, approval, channel projections and cart state. Returned to the verified baseline.")
-        : activity("System", "Evidence synced", "8 verified Shopify and operations facts are ready for agent use."),
+        : activity("System", "Fixture adapter loaded", "8 provenance-bound fixture facts are ready through commerce contract v1; no Shopify request was sent."),
     ],
   };
 }
@@ -114,6 +127,38 @@ function update(recipe: (current: AppState) => AppState): AppState {
 
 function addActivity(current: AppState, actor: Activity["actor"], action: string, detail: string): Activity[] {
   return [activity(actor, action, detail), ...current.activities].slice(0, 12);
+}
+
+function evidenceForVariant(current: AppState): EvidenceRecord[] {
+  const byId = new Map(current.evidence.map((record) => [record.id, record]));
+  const selected = current.variant.evidenceIds.flatMap((id) => {
+    const record = byId.get(id);
+    return record ? [record] : [];
+  });
+  assertEvidenceAuthority(selected, current.variant.productIdentity, current.variant.evidenceIds);
+  return selected;
+}
+
+function representationFor(current: AppState, payloadDigest: string): RepresentationVariant {
+  return {
+    contractVersion: current.variant.contractVersion,
+    id: current.variant.id,
+    productIdentity: current.variant.productIdentity,
+    copy: {
+      title: current.variant.title,
+      description: current.variant.description,
+      bullets: current.variant.bullets,
+    },
+    evidenceIds: current.variant.evidenceIds,
+    payloadDigest,
+    status: current.variant.status === "published" ? "published" : "approved",
+  };
+}
+
+function assertWorkspaceUnchanged(expected: AppState, action: string): void {
+  if (state !== expected) {
+    throw new Error(`${action} blocked: the workspace changed while approval evidence was being verified; retry from current state.`);
+  }
 }
 
 export const appStore = {
@@ -137,9 +182,11 @@ export const appStore = {
         status: "draft",
         approvedDigest: null,
         approvedAt: null,
+        approval: null,
         publishedAt: null,
       },
       variantEvaluation: null,
+      commerce: { ...current.commerce, updatePreview: null },
       adsPackage: initialAdsPackage(),
       activities: addActivity(current, actor, "Variant generated", "Rewrote the product around eight verified buyer-relevant facts."),
     })).variant;
@@ -148,7 +195,7 @@ export const appStore = {
     if (state.variant.status !== "draft") {
       throw new Error("Evaluation blocked: create an evidence-led draft first.");
     }
-    const evaluation = evaluateCopy(state.variant, state.evidence, "Evidence-led variant");
+    const evaluation = evaluateCopy(state.variant, state.evidence, "Evidence-led variant", state.variant.productIdentity);
     update((current) => ({
       ...current,
       variantEvaluation: evaluation,
@@ -162,45 +209,78 @@ export const appStore = {
     }
     return update((current) => ({
       ...current,
-      variant: { ...current.variant, status: "staged", approvedDigest: null, approvedAt: null },
+      variant: { ...current.variant, status: "staged", approvedDigest: null, approvedAt: null, approval: null },
       activities: addActivity(current, actor, "Variant staged", "The tested variant is ready at the visible review checkpoint; no live channel changed."),
     })).variant;
   },
-  recordVisibleApproval() {
-    if (state.variant.status !== "staged") throw new Error("Only a staged variant can be approved.");
-    const approvedDigest = digestVariant(state.variant, state.variant.evidenceIds);
+  async recordVisibleApproval() {
+    const candidate = state;
+    if (candidate.variant.status !== "staged") throw new Error("Only a staged variant can be approved.");
+    const approvedEvidence = evidenceForVariant(candidate);
+    const approvedDigest = await digestApprovalPayload({ target: candidate.variant.productIdentity, copy: candidate.variant, evidence: approvedEvidence });
+    assertWorkspaceUnchanged(candidate, "Approval");
+    const approvedAt = new Date().toISOString();
+    const approval: ApprovalEnvelope = {
+      contractVersion: candidate.variant.contractVersion,
+      assurance: "demo_ui_gesture",
+      principalId: null,
+      target: candidate.variant.productIdentity,
+      payloadDigest: approvedDigest,
+      evidenceIds: [...candidate.variant.evidenceIds],
+      policyVersion: "conversion-lab.demo-approval.v1",
+      approvedAt,
+      expiresAt: null,
+    };
     return update((current) => ({
       ...current,
-      variant: { ...current.variant, status: "approved", approvedDigest, approvedAt: new Date().toISOString() },
+      variant: { ...current.variant, status: "approved", approvedDigest, approvedAt, approval },
       activities: addActivity(current, "Browser user", "Visible approval recorded", `Browser UI gesture bound to ${approvedDigest}; this credential-free demo does not authenticate the actor.`),
     })).variant;
   },
-  publishVariant(actor: Activity["actor"] = "Agent") {
-    const currentDigest = digestVariant(state.variant, state.variant.evidenceIds);
-    if (state.variant.status !== "approved" || state.variant.approvedDigest !== currentDigest) {
+  async publishVariant(actor: Activity["actor"] = "Agent") {
+    const candidate = state;
+    const approvedEvidence = evidenceForVariant(candidate);
+    const currentDigest = await digestApprovalPayload({ target: candidate.variant.productIdentity, copy: candidate.variant, evidence: approvedEvidence });
+    assertWorkspaceUnchanged(candidate, "Publication");
+    if (candidate.variant.status !== "approved" || !candidate.variant.approval || candidate.variant.approvedDigest !== currentDigest) {
       throw new Error("Publication blocked: this exact variant does not have current digest-bound approval state.");
     }
+    const representation = representationFor(candidate, currentDigest);
+    await assertApprovalBinding({ approval: candidate.variant.approval, representation, evidence: approvedEvidence });
+    assertWorkspaceUnchanged(candidate, "Publication");
+    const updatePreview = await previewShopifyProductUpdate({
+      approval: candidate.variant.approval,
+      representation,
+      evidence: approvedEvidence,
+    });
+    assertWorkspaceUnchanged(candidate, "Publication");
     return update((current) => ({
       ...current,
       variant: { ...current.variant, status: "published", publishedAt: new Date().toISOString() },
-      activities: addActivity(current, actor, "Shopify projection published", "The approved copy is now visible in the demo storefront."),
+      commerce: { ...current.commerce, updatePreview },
+      activities: addActivity(current, actor, "Shopify preview prepared", "The approved copy is visible in the demo storefront and mapped to a blocked Shopify Admin update preview; no live write occurred."),
     })).variant;
   },
-  prepareAds(actor: Activity["actor"] = "Agent") {
-    const currentDigest = digestVariant(state.variant, state.variant.evidenceIds);
-    if (state.variant.status !== "published" || state.variant.approvedDigest !== currentDigest) {
+  async prepareAds(actor: Activity["actor"] = "Agent") {
+    const candidate = state;
+    const approvedEvidence = evidenceForVariant(candidate);
+    const currentDigest = await digestApprovalPayload({ target: candidate.variant.productIdentity, copy: candidate.variant, evidence: approvedEvidence });
+    assertWorkspaceUnchanged(candidate, "Ads preparation");
+    if (candidate.variant.status !== "published" || !candidate.variant.approval || candidate.variant.approvedDigest !== currentDigest) {
       throw new Error("Ads preparation blocked: publish the exact digest-approved variant first.");
     }
-    const copy = state.variant;
+    await assertApprovalBinding({ approval: candidate.variant.approval, representation: representationFor(candidate, currentDigest), evidence: approvedEvidence });
+    assertWorkspaceUnchanged(candidate, "Ads preparation");
+    const copy = candidate.variant;
     const feed: OpenAIProductFeedRow = {
-      id: state.product.sku,
+      id: candidate.product.sku,
       title: copy.title,
       description: copy.description,
-      price: `${state.product.price}.00 GBP`,
-      availability: state.product.inventory > 0 ? "in_stock" : "out_of_stock",
-      link: `https://demo.invalid/products/${state.product.handle}`,
+      price: `${candidate.product.price}.00 GBP`,
+      availability: candidate.product.inventory > 0 ? "in_stock" : "out_of_stock",
+      link: `https://demo.invalid/products/${candidate.product.handle}`,
       image_link: "https://demo.invalid/commuter-pack.png",
-      brand: state.product.brand,
+      brand: candidate.product.brand,
       identifier_exists: "no",
       is_ads_eligible: true,
     };

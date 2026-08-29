@@ -175,14 +175,14 @@ function Studio() {
   const isPublished = state.variant.status === "published";
   const isComplete = state.adsPackage.status === "ready" && state.cartQuantity > 0;
 
-  const runPrimaryAction = () => {
+  const runPrimaryAction = async () => {
     try {
       if (state.variant.status === "baseline") appStore.generateVariant("Browser user");
       else if (!state.variantEvaluation) appStore.runEvaluation("Browser user");
       else if (canStage) appStore.stageVariant("Browser user");
-      else if (canApprove) appStore.recordVisibleApproval();
-      else if (canPublish) appStore.publishVariant("Browser user");
-      else if (state.adsPackage.status !== "ready") appStore.prepareAds("Browser user");
+      else if (canApprove) await appStore.recordVisibleApproval();
+      else if (canPublish) await appStore.publishVariant("Browser user");
+      else if (state.adsPackage.status !== "ready") await appStore.prepareAds("Browser user");
       else appStore.setSurface("storefront");
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "The action could not be completed.");
@@ -264,8 +264,8 @@ function Studio() {
           <article>
             <div className="channel-index">01 / ORGANIC</div>
             <h3>Shopify + WebMCP</h3>
-            <p>Agents search verified product facts, explain the match and update the visible demo cart in the shopper’s live session.</p>
-            <div className="channel-status"><StatusDot tone={isPublished ? "good" : "warning"} /><span>{isPublished ? "Published to demo storefront" : "Awaiting approved publication"}</span></div>
+            <p>Versioned fixture truth feeds the demo today; the same native identity and approved digest produce a Shopify Admin 2026-07 update preview without exposing credentials.</p>
+            <div className="channel-status"><StatusDot tone={isPublished ? "good" : "warning"} /><span>{state.commerce.updatePreview ? "Demo published · Shopify payload preview ready" : "Awaiting approved publication"}</span></div>
           </article>
           <article className="channel-paid">
             <div className="channel-index">02 / PAID</div>
