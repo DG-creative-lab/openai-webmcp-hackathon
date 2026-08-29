@@ -189,7 +189,7 @@ export async function registerWebMCPTools(): Promise<boolean> {
         const state = appStore.getState();
         return success(effects.read, {
           organic: { ready: state.variant.status === "published", reason: state.variant.status === "published" ? "Approved variant published" : "Approved demo publication required" },
-          paid: { ready: state.adsPackage.status === "ready", reason: state.adsPackage.status === "ready" ? "Ads-eligible PAUSED feed projection prepared" : "Prepare the projection after approved publication" },
+          paid: { ready: state.adsPackage.status === "ready", reason: state.adsPackage.status === "ready" ? "Digest-bound Google-compatible CSV and PAUSED feed projection prepared" : "Prepare the projection after approved publication" },
           verifiedEvidence: `${state.evidence.filter((item) => item.verified).length}/${state.evidence.length}`,
           safety: "Paid activation, spend, checkout and payment are outside this demo's authority.",
         }, state.variant.status === "baseline" ? "Create an evidence-led draft." : "Continue the lifecycle shown in workspace.variant.status.");
@@ -240,7 +240,7 @@ export async function registerWebMCPTools(): Promise<boolean> {
     },
     {
       name: "prepare_openai_ads_package",
-      description: "Prepare an Ads-eligible product-feed row and PAUSED campaign projection from the exact approved published copy. Changes demo projection state only; no Ads API request, activation or spend can occur.",
+      description: "Prepare an Ads-eligible Google-compatible CSV feed export and PAUSED campaign projection from the exact approved published copy. Changes demo projection state only; no SFTP upload, Ads API request, activation or spend can occur.",
       inputSchema: emptySchema,
       annotations: stateChangeAnnotations,
       execute: noInput(async () => success(effects.paid, {

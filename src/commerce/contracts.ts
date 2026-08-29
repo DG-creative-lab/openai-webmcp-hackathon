@@ -67,11 +67,22 @@ export interface EvaluationResult {
   createdAt: string;
 }
 
+export interface ApprovalProductSnapshot {
+  readonly sku: string;
+  readonly brand: string;
+  readonly price: number;
+  readonly currency: "GBP";
+  readonly inventory: number;
+  readonly productUrl: string;
+  readonly imageUrl: string;
+}
+
 export interface ApprovalEnvelope {
   readonly contractVersion: CommerceContractVersion;
   readonly assurance: "demo_ui_gesture" | "authenticated_merchant";
   readonly principalId: string | null;
   readonly target: Readonly<CommerceIdentity>;
+  readonly productSnapshot: Readonly<ApprovalProductSnapshot>;
   readonly payloadDigest: string;
   readonly evidenceIds: readonly string[];
   readonly policyVersion: string;

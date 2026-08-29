@@ -183,6 +183,9 @@ button:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
 .channel-grid article > p { max-width: 520px; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .channel-paid > p { color: #aaa79f !important; }
 .channel-status { display: flex; align-items: center; gap: 10px; margin-top: auto; font: 400 9px/1 "DM Mono", monospace; }
+.feed-download { display: flex; align-items: center; justify-content: space-between; gap: 18px; width: 100%; margin-top: 18px; padding: 11px 0 0; border: 0; border-top: 1px solid rgba(241, 238, 230, .28); background: transparent; color: var(--paper); cursor: pointer; font: 500 9px/1.25 "DM Mono", monospace; text-align: left; }
+.feed-download small { color: #8b8983; font: inherit; }
+.feed-download:hover span { color: var(--acid); }
 
 .shop-banner { height: 37px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid var(--ink); font-size: 8px; }
 .product-page { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(410px, .65fr); min-height: calc(100vh - 105px); }

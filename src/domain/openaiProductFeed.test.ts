@@ -34,6 +34,19 @@ describe("OpenAI product-feed local schema validator", () => {
     expect(validateOpenAIProductFeedRow({ ...row, gtin: "123456789012" })).toMatchObject({ valid: true, errors: [] });
   });
 
+  it("accepts the 70-character MPN boundary and rejects 71 characters", () => {
+    expect(validateOpenAIProductFeedRow({
+      ...validRow,
+      identifier_exists: "yes",
+      mpn: "X".repeat(70),
+    })).toMatchObject({ valid: true, errors: [] });
+    expect(validateOpenAIProductFeedRow({
+      ...validRow,
+      identifier_exists: "yes",
+      mpn: "X".repeat(71),
+    })).toMatchObject({ valid: false, errors: expect.arrayContaining(["length:mpn"]) });
+  });
+
   it.each(["preorder", "backorder"] as const)("rejects %s without an availability date", (availability) => {
     expect(validateOpenAIProductFeedRow({ ...validRow, availability })).toMatchObject({
       valid: false,
@@ -94,6 +107,28 @@ describe("OpenAI product-feed local schema validator", () => {
     })).toMatchObject({
       valid: false,
       errors: expect.arrayContaining(["conflict:identifier_exists", "format:gtin", "format:price", "format:link"]),
+    });
+  });
+
+  it("rejects overlong core fields and credential-bearing product URLs", () => {
+    expect(validateOpenAIProductFeedRow({
+      ...validRow,
+      id: "a".repeat(101),
+      title: "t".repeat(151),
+      description: "d".repeat(5_001),
+      brand: "b".repeat(71),
+      link: "https://user:secret@merchant.example/product",
+      image_link: "https://user:secret@merchant.example/image.png",
+    })).toMatchObject({
+      valid: false,
+      errors: expect.arrayContaining([
+        "length:id",
+        "length:title",
+        "length:description",
+        "length:brand",
+        "format:link",
+        "format:image_link",
+      ]),
     });
   });
 });

@@ -11,7 +11,7 @@ A judge can watch a generic listing move from 0/8 to 8/8 deterministic buyer-int
 ## Non-negotiable invariants
 
 1. No product claim without a verified evidence record.
-2. No demo publication without current approval state bound by a versioned SHA-256 digest to the exact product target, copy and runtime-validated provenance-bearing evidence; do not present the credential-free UI gesture as authenticated merchant authority.
+2. No demo publication without current approval state bound by a versioned SHA-256 digest to one owned snapshot of the exact product target, feed-bearing commercial fields with canonical GBP minor-unit precision, copy and runtime-validated provenance-bearing evidence; do not present the credential-free UI gesture as authenticated merchant authority.
 3. No paid campaign activation or spend.
 4. Every agent action changes the same state the merchant sees.
 5. Every important effect produces a visible activity event.
@@ -23,7 +23,7 @@ A judge can watch a generic listing move from 0/8 to 8/8 deterministic buyer-int
 
 - **Shopify:** faithful local projection of product/catalogue and storefront state.
 - **WebMCP:** live page-scoped tools registered through `document.modelContext`.
-- **OpenAI Ads:** product-feed row and paused campaign projection based on the same approved product truth.
+- **OpenAI Ads:** digest-bound Google-compatible CSV feed export and paused campaign projection based on the same approved product truth.
 - **Codex:** agent operator that can discover and invoke the page's site tools while the merchant watches the same workspace.
 
 ## Intentionally deferred

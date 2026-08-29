@@ -1,19 +1,29 @@
 import { describe, expect, it } from "vitest";
 import { digestApprovalPayload } from "./approvalBinding";
-import { COMMERCE_CONTRACT_VERSION, type ApprovalEnvelope, type CommerceCopy, type EvidenceRecord, type RepresentationVariant } from "./contracts";
+import { COMMERCE_CONTRACT_VERSION, type ApprovalEnvelope, type ApprovalProductSnapshot, type CommerceCopy, type EvidenceRecord, type RepresentationVariant } from "./contracts";
 import { createFieldworkFixtureSnapshot } from "./fieldworkFixture";
 import { previewShopifyProductRead, previewShopifyProductUpdate, SHOPIFY_ADMIN_API_VERSION } from "./shopifyAdminPreview";
 
 async function approvedBinding(copy: CommerceCopy = { title: "Approved title", description: "Approved description", bullets: ["Approved evidence"] }) {
   const snapshot = createFieldworkFixtureSnapshot();
   const target = snapshot.product.identity;
+  const productSnapshot: ApprovalProductSnapshot = {
+    sku: snapshot.product.sku,
+    brand: snapshot.product.brand,
+    price: snapshot.product.price,
+    currency: snapshot.product.currency,
+    inventory: snapshot.product.inventory,
+    productUrl: "https://conversion-lab-webmcp.vercel.app/",
+    imageUrl: "https://conversion-lab-webmcp.vercel.app/commuter-pack.png",
+  };
   const evidenceIds = snapshot.evidence.map((record) => record.id);
-  const payloadDigest = await digestApprovalPayload({ target, copy, evidence: snapshot.evidence });
+  const payloadDigest = await digestApprovalPayload({ target, productSnapshot, copy, evidence: snapshot.evidence });
   const approval: ApprovalEnvelope = {
     contractVersion: COMMERCE_CONTRACT_VERSION,
     assurance: "demo_ui_gesture",
     principalId: null,
     target,
+    productSnapshot,
     payloadDigest,
     evidenceIds,
     policyVersion: "conversion-lab.demo-approval.v1",
@@ -115,12 +125,36 @@ describe("versioned commerce adapter spine", () => {
     })).rejects.toThrow(/changed after approval/i);
   });
 
+  it("rejects reuse of an approval after the feed-bearing commercial snapshot changes", async () => {
+    const binding = await approvedBinding();
+    await expect(previewShopifyProductUpdate({
+      ...binding,
+      approval: {
+        ...binding.approval,
+        productSnapshot: { ...binding.approval.productSnapshot, price: 1 },
+      },
+    })).rejects.toThrow(/changed after approval/i);
+  });
+
+  it("uses the captured approved copy when caller-owned inputs mutate during verification", async () => {
+    const binding = await approvedBinding();
+    const pending = previewShopifyProductUpdate(binding);
+    (binding.representation.copy as { title: string }).title = "Changed during verification";
+    (binding.approval.productSnapshot as { price: number }).price = 1;
+
+    await expect(pending).resolves.toMatchObject({
+      payloadDigest: binding.approval.payloadDigest,
+      payload: { variables: { product: { title: "Approved title" } } },
+    });
+  });
+
   it("uses versioned SHA-256 so the known FNV-1a collision cannot reuse approval", async () => {
     const firstCopy = { title: "Candidate pju3ec-1uwi", description: "Approved description", bullets: ["Approved evidence"] };
     const secondCopy = { ...firstCopy, title: "Candidate 16stnjm-3ikt" };
     const binding = await approvedBinding(firstCopy);
     const secondDigest = await digestApprovalPayload({
       target: binding.approval.target,
+      productSnapshot: binding.approval.productSnapshot,
       copy: secondCopy,
       evidence: binding.evidence,
     });
@@ -166,7 +200,12 @@ describe("versioned commerce adapter spine", () => {
       approval: { ...binding.approval, evidenceIds: [...binding.approval.evidenceIds, binding.approval.evidenceIds[0]] },
       representation: { ...binding.representation, evidenceIds: [...binding.representation.evidenceIds, binding.representation.evidenceIds[0]] },
     })).rejects.toThrow(/unique/i);
-    const emptyDigest = await digestApprovalPayload({ target: binding.approval.target, copy: binding.representation.copy, evidence: [] });
+    const emptyDigest = await digestApprovalPayload({
+      target: binding.approval.target,
+      productSnapshot: binding.approval.productSnapshot,
+      copy: binding.representation.copy,
+      evidence: [],
+    });
     await expect(previewShopifyProductUpdate({
       approval: { ...binding.approval, evidenceIds: [], payloadDigest: emptyDigest },
       representation: { ...binding.representation, evidenceIds: [], payloadDigest: emptyDigest },
@@ -192,7 +231,12 @@ describe("versioned commerce adapter spine", () => {
   it("rejects self-consistently rehashed evidence with missing freshness or an impossible timestamp", async () => {
     const binding = await approvedBinding();
     const assertInvalidProvenance = async (evidence: EvidenceRecord[], expected: RegExp) => {
-      const payloadDigest = await digestApprovalPayload({ target: binding.approval.target, copy: binding.representation.copy, evidence });
+      const payloadDigest = await digestApprovalPayload({
+        target: binding.approval.target,
+        productSnapshot: binding.approval.productSnapshot,
+        copy: binding.representation.copy,
+        evidence,
+      });
       await expect(previewShopifyProductUpdate({
         approval: { ...binding.approval, payloadDigest },
         representation: { ...binding.representation, payloadDigest },
@@ -220,7 +264,12 @@ describe("versioned commerce adapter spine", () => {
       ...record,
       provenance: { ...record.provenance, freshness: "live" as const, observedAt: "2026-08-28T00:00:00Z" },
     }));
-    const payloadDigest = await digestApprovalPayload({ target: binding.approval.target, copy: binding.representation.copy, evidence });
+    const payloadDigest = await digestApprovalPayload({
+      target: binding.approval.target,
+      productSnapshot: binding.approval.productSnapshot,
+      copy: binding.representation.copy,
+      evidence,
+    });
     await expect(previewShopifyProductUpdate({
       approval: { ...binding.approval, payloadDigest },
       representation: { ...binding.representation, payloadDigest },

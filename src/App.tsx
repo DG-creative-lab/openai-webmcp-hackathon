@@ -23,7 +23,7 @@ function journeyGuide(state: AppState) {
     return { progress: 5, actor: "Agent", effect: "Demo cart", title: "Complete the shopper handoff", instruction: "Match the published product to the shopper need and set the visible cart quantity to 2. Checkout stays unavailable.", prompt: continuationPrompt };
   }
   if (state.variant.status === "published") {
-    return { progress: 4, actor: "Agent", effect: "Paid projection", title: "Project the approved truth", instruction: "Prepare the OpenAI Ads package. It must remain PAUSED, credential-free and £0 spend.", prompt: continuationPrompt };
+    return { progress: 4, actor: "Agent", effect: "Paid projection", title: "Project the approved truth", instruction: "Prepare the OpenAI Ads package and digest-bound CSV export. It must remain PAUSED, credential-free and £0 spend.", prompt: continuationPrompt };
   }
   if (state.variant.status === "approved") {
     return { progress: 4, actor: "Agent", effect: "Demo publish", title: "Continue after visible approval", instruction: "Publish the exact approved digest to the demo storefront, then prepare the paid projection.", prompt: continuationPrompt };
@@ -175,6 +175,19 @@ function Studio() {
   const isPublished = state.variant.status === "published";
   const isComplete = state.adsPackage.status === "ready" && state.cartQuantity > 0;
 
+  const downloadAdsFeed = () => {
+    const artifact = appStore.getState().adsPackage.feedExport;
+    if (!artifact) return;
+    const url = URL.createObjectURL(new Blob([artifact.contents], { type: artifact.mediaType }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = artifact.filename;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
   const runPrimaryAction = async () => {
     try {
       if (state.variant.status === "baseline") appStore.generateVariant("Browser user");
@@ -270,8 +283,14 @@ function Studio() {
           <article className="channel-paid">
             <div className="channel-index">02 / PAID</div>
             <h3>OpenAI Ads projection</h3>
-            <p>The same evidence becomes an Ads-eligible product-feed row and relevant product ad template—not a separate creative fiction.</p>
-            <div className="channel-status"><StatusDot tone={state.adsPackage.status === "ready" ? "good" : "warning"} /><span>{state.adsPackage.status === "ready" ? "Schema valid locally · Campaign PAUSED" : "Projection not prepared"}</span></div>
+            <p>The same evidence becomes an Ads-eligible Google-compatible CSV and relevant product ad template—not a separate creative fiction.</p>
+            <div className="channel-status"><StatusDot tone={state.adsPackage.status === "ready" ? "good" : "warning"} /><span>{state.adsPackage.status === "ready" ? "CSV ready · Schema valid locally · Campaign PAUSED" : "Projection not prepared"}</span></div>
+            {state.adsPackage.feedExport && (
+              <button type="button" className="feed-download" onClick={downloadAdsFeed}>
+                <span>Download Ads feed CSV</span>
+                <small>{state.adsPackage.feedExport.contentDigest.slice(0, 17)}…</small>
+              </button>
+            )}
           </article>
         </div>
       </section>

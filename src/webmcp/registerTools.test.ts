@@ -98,6 +98,12 @@ describe("WebMCP registration", () => {
       adsPackage: {
         campaignStatus: "PAUSED",
         feed: { identifier_exists: "no", is_ads_eligible: true },
+        feedExport: {
+          format: "google-compatible-csv",
+          rowCount: 1,
+          sourcePayloadDigest: expect.stringMatching(/^sha256-v1-[a-f0-9]{64}$/),
+          delivery: { transport: "SFTP", advertiserApiUploadSupported: false },
+        },
         validation: { scope: "local_schema", valid: true, errors: [] },
       },
       projectedSpend: "GBP 0",

@@ -5,7 +5,7 @@ import {
   type EvidenceRecord,
   type RepresentationVariant,
 } from "./contracts";
-import { assertApprovalBinding } from "./approvalBinding";
+import { verifyApprovalBinding } from "./approvalBinding";
 import {
   createShopifyIdentity,
   shopifyAdminEndpoint,
@@ -86,9 +86,9 @@ export async function previewShopifyProductUpdate(input: {
   if (input.approval.target.provider !== "shopify") {
     throw new Error("Shopify update preview blocked: approval must target a Shopify product identity.");
   }
-  const previewTarget = createShopifyIdentity(input.approval.target.storeId, input.approval.target.productId);
-  const approvedDigest = await assertApprovalBinding(input);
-  if (!input.representation.copy.title.trim() || !input.representation.copy.description.trim()) {
+  const verified = await verifyApprovalBinding(input);
+  const previewTarget = createShopifyIdentity(verified.approval.target.storeId, verified.approval.target.productId);
+  if (!verified.representation.copy.title.trim() || !verified.representation.copy.description.trim()) {
     throw new Error("Shopify update preview blocked: title and description must be non-empty.");
   }
 
@@ -100,7 +100,7 @@ export async function previewShopifyProductUpdate(input: {
     operation: "update_product",
     apiVersion: SHOPIFY_ADMIN_API_VERSION,
     target: previewTarget,
-    payloadDigest: approvedDigest,
+    payloadDigest: verified.payloadDigest,
     externalWrite: false,
     payload: {
       method: "POST",
@@ -109,8 +109,8 @@ export async function previewShopifyProductUpdate(input: {
       variables: {
         product: {
           id: previewTarget.productId,
-          title: input.representation.copy.title,
-          descriptionHtml: input.representation.copy.description,
+          title: verified.representation.copy.title,
+          descriptionHtml: verified.representation.copy.description,
         },
       },
       requiredScopes: ["write_products"],

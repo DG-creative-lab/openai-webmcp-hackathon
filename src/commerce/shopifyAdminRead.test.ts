@@ -150,6 +150,7 @@ describe("Shopify dev-store product reader", () => {
     ["ambiguous variants", (payload: ReturnType<typeof responsePayload>) => { payload.data.product.variants.nodes.push({ ...payload.data.product.variants.nodes[0], id: "gid://shopify/ProductVariant/202" }); }, /single-variant product/i],
     ["missing SKU", (payload: ReturnType<typeof responsePayload>) => { payload.data.product.variants.nodes[0].sku = ""; }, /SKU is missing/i],
     ["invalid price", (payload: ReturnType<typeof responsePayload>) => { payload.data.product.variants.nodes[0].price = "-1"; }, /price is missing or invalid/i],
+    ["over-precise price", (payload: ReturnType<typeof responsePayload>) => { payload.data.product.variants.nodes[0].price = "1.005"; }, /price is missing or invalid/i],
     ["non-finite price", (payload: ReturnType<typeof responsePayload>) => { payload.data.product.variants.nodes[0].price = "9".repeat(400); }, /price is missing or invalid/i],
     ["invalid inventory", (payload: ReturnType<typeof responsePayload>) => { payload.data.product.totalInventory = 1.5; }, /inventory is missing or invalid/i],
     ["invalid featured media", (payload: ReturnType<typeof responsePayload>) => { payload.data.product.featuredMedia = {} as never; }, /featured image response/i],

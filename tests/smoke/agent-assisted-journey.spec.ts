@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 type ToolResult = Record<string, unknown>;
 
@@ -93,16 +94,36 @@ test("an agent discovers the tools and completes the journey around the visible 
 
   await executeTool(page, "publish_approved_variant");
   const ads = await executeTool(page, "prepare_openai_ads_package") as {
-    adsPackage: { campaignStatus: string; disclaimer: string; feed: Record<string, unknown>; validation: { valid: boolean; unverified: string[] } };
+    adsPackage: {
+      campaignStatus: string;
+      disclaimer: string;
+      feed: Record<string, unknown>;
+      feedExport: { contentDigest: string; sourcePayloadDigest: string; delivery: { advertiserApiUploadSupported: boolean } };
+      validation: { valid: boolean; unverified: string[] };
+    };
     effect: { class: string; externalWrite: boolean };
   };
   expect(ads.adsPackage.campaignStatus).toBe("PAUSED");
   expect(ads.adsPackage.disclaimer).toMatch(/No Ads API call/);
   expect(ads.adsPackage.feed).toMatchObject({ identifier_exists: "no", is_ads_eligible: true });
+  expect(ads.adsPackage.feedExport).toMatchObject({
+    contentDigest: expect.stringMatching(/^sha256-v1-[a-f0-9]{64}$/),
+    sourcePayloadDigest: expect.stringMatching(/^sha256-v1-[a-f0-9]{64}$/),
+    delivery: { advertiserApiUploadSupported: false },
+  });
   expect(ads.adsPackage.validation).toMatchObject({ valid: true });
   expect(ads.adsPackage.validation.unverified.length).toBeGreaterThan(0);
   expect(ads.effect).toMatchObject({ class: "paid_projection", externalWrite: false });
-  await expect(page.getByText("Schema valid locally · Campaign PAUSED")).toBeVisible();
+  await expect(page.getByText("CSV ready · Schema valid locally · Campaign PAUSED")).toBeVisible();
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: /Download Ads feed CSV/ }).click();
+  const download = await downloadEvent;
+  expect(download.suggestedFilename()).toBe("conversion-lab-openai-ads-feed.csv");
+  const downloadPath = await download.path();
+  expect(downloadPath).not.toBeNull();
+  const feedContents = await readFile(downloadPath!, "utf8");
+  expect(feedContents).toContain("id,title,description,link,image_link");
+  expect(feedContents).toContain('"URB-24-BLK","24L Waterproof Commuter Backpack + Pannier"');
 
   const recommendation = await executeTool(page, "search_product_by_need", {
     query: "I need a waterproof bag for a 16-inch laptop",

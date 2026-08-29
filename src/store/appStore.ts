@@ -1,12 +1,14 @@
 import { createFieldworkFixtureSnapshot } from "../commerce/fieldworkFixture";
 import { assertApprovalBinding, assertEvidenceAuthority, digestApprovalPayload } from "../commerce/approvalBinding";
+import { prepareOpenAIAdsFeedProjection } from "../commerce/openaiAdsFeedProjection";
 import { previewShopifyProductRead, previewShopifyProductUpdate } from "../commerce/shopifyAdminPreview";
-import { COMMERCE_CONTRACT_VERSION, type ApprovalEnvelope, type EvidenceRecord, type RepresentationVariant } from "../commerce/contracts";
+import { COMMERCE_CONTRACT_VERSION, type ApprovalEnvelope, type ApprovalProductSnapshot, type EvidenceRecord, type RepresentationVariant } from "../commerce/contracts";
 import { evaluateCopy } from "../domain/evaluation";
-import { validateOpenAIProductFeedRow } from "../domain/openaiProductFeed";
-import type { Activity, AppState, OpenAIProductFeedRow, ProductCopy, Surface } from "../domain/types";
+import type { Activity, AppState, ProductCopy, Surface } from "../domain/types";
 
 const commerceSnapshot = createFieldworkFixtureSnapshot();
+const publicProductUrl = "https://conversion-lab-webmcp.vercel.app/";
+const publicImageUrl = "https://conversion-lab-webmcp.vercel.app/commuter-pack.png";
 const evidence: EvidenceRecord[] = commerceSnapshot.evidence.map((record) => ({
   ...record,
   productIdentity: { ...record.productIdentity },
@@ -58,6 +60,7 @@ function initialAdsPackage(): AppState["adsPackage"] {
     status: "not_prepared",
     campaignStatus: "not_created",
     feed: null,
+    feedExport: null,
     validation: null,
     adTemplate: null,
     disclaimer: "Demo projection only. No Ads API call, campaign activation or spend can occur.",
@@ -139,6 +142,18 @@ function evidenceForVariant(current: AppState): EvidenceRecord[] {
   return selected;
 }
 
+function approvalProductSnapshot(current: AppState): ApprovalProductSnapshot {
+  return {
+    sku: current.product.sku,
+    brand: current.product.brand,
+    price: current.product.price,
+    currency: current.product.currency,
+    inventory: current.product.inventory,
+    productUrl: publicProductUrl,
+    imageUrl: publicImageUrl,
+  };
+}
+
 function representationFor(current: AppState, payloadDigest: string): RepresentationVariant {
   return {
     contractVersion: current.variant.contractVersion,
@@ -217,7 +232,13 @@ export const appStore = {
     const candidate = state;
     if (candidate.variant.status !== "staged") throw new Error("Only a staged variant can be approved.");
     const approvedEvidence = evidenceForVariant(candidate);
-    const approvedDigest = await digestApprovalPayload({ target: candidate.variant.productIdentity, copy: candidate.variant, evidence: approvedEvidence });
+    const productSnapshot = approvalProductSnapshot(candidate);
+    const approvedDigest = await digestApprovalPayload({
+      target: candidate.variant.productIdentity,
+      productSnapshot,
+      copy: candidate.variant,
+      evidence: approvedEvidence,
+    });
     assertWorkspaceUnchanged(candidate, "Approval");
     const approvedAt = new Date().toISOString();
     const approval: ApprovalEnvelope = {
@@ -225,6 +246,7 @@ export const appStore = {
       assurance: "demo_ui_gesture",
       principalId: null,
       target: candidate.variant.productIdentity,
+      productSnapshot,
       payloadDigest: approvedDigest,
       evidenceIds: [...candidate.variant.evidenceIds],
       policyVersion: "conversion-lab.demo-approval.v1",
@@ -240,7 +262,12 @@ export const appStore = {
   async publishVariant(actor: Activity["actor"] = "Agent") {
     const candidate = state;
     const approvedEvidence = evidenceForVariant(candidate);
-    const currentDigest = await digestApprovalPayload({ target: candidate.variant.productIdentity, copy: candidate.variant, evidence: approvedEvidence });
+    const currentDigest = await digestApprovalPayload({
+      target: candidate.variant.productIdentity,
+      productSnapshot: approvalProductSnapshot(candidate),
+      copy: candidate.variant,
+      evidence: approvedEvidence,
+    });
     assertWorkspaceUnchanged(candidate, "Publication");
     if (candidate.variant.status !== "approved" || !candidate.variant.approval || candidate.variant.approvedDigest !== currentDigest) {
       throw new Error("Publication blocked: this exact variant does not have current digest-bound approval state.");
@@ -264,28 +291,22 @@ export const appStore = {
   async prepareAds(actor: Activity["actor"] = "Agent") {
     const candidate = state;
     const approvedEvidence = evidenceForVariant(candidate);
-    const currentDigest = await digestApprovalPayload({ target: candidate.variant.productIdentity, copy: candidate.variant, evidence: approvedEvidence });
+    const currentDigest = await digestApprovalPayload({
+      target: candidate.variant.productIdentity,
+      productSnapshot: approvalProductSnapshot(candidate),
+      copy: candidate.variant,
+      evidence: approvedEvidence,
+    });
     assertWorkspaceUnchanged(candidate, "Ads preparation");
     if (candidate.variant.status !== "published" || !candidate.variant.approval || candidate.variant.approvedDigest !== currentDigest) {
       throw new Error("Ads preparation blocked: publish the exact digest-approved variant first.");
     }
-    await assertApprovalBinding({ approval: candidate.variant.approval, representation: representationFor(candidate, currentDigest), evidence: approvedEvidence });
+    const { feed, validation, feedExport } = await prepareOpenAIAdsFeedProjection({
+      approval: candidate.variant.approval,
+      representation: representationFor(candidate, currentDigest),
+      evidence: approvedEvidence,
+    });
     assertWorkspaceUnchanged(candidate, "Ads preparation");
-    const copy = candidate.variant;
-    const feed: OpenAIProductFeedRow = {
-      id: candidate.product.sku,
-      title: copy.title,
-      description: copy.description,
-      price: `${candidate.product.price}.00 GBP`,
-      availability: candidate.product.inventory > 0 ? "in_stock" : "out_of_stock",
-      link: `https://demo.invalid/products/${candidate.product.handle}`,
-      image_link: "https://demo.invalid/commuter-pack.png",
-      brand: candidate.product.brand,
-      identifier_exists: "no",
-      is_ads_eligible: true,
-    };
-    const validation = validateOpenAIProductFeedRow(feed);
-    if (!validation.valid) throw new Error(`Ads preparation blocked: local feed schema failed (${validation.errors.join(", ")}).`);
     return update((current) => ({
       ...current,
       adsPackage: {
@@ -293,10 +314,11 @@ export const appStore = {
         status: "ready",
         campaignStatus: "PAUSED",
         feed,
+        feedExport,
         validation,
-        adTemplate: { headline: copy.title, description: copy.description },
+        adTemplate: { headline: candidate.variant.title, description: candidate.variant.description },
       },
-      activities: addActivity(current, actor, "Ads package prepared", "Created a locally schema-valid Ads product-feed row and PAUSED campaign projection. URL reachability and OpenAI acceptance remain unverified; £0 spend."),
+      activities: addActivity(current, actor, "Ads package prepared", "Created a digest-bound Google-compatible CSV export, locally schema-valid feed row and PAUSED campaign projection. Ads Manager feed connection, SFTP upload and OpenAI acceptance remain external; £0 spend."),
     })).adsPackage;
   },
   updateCart(quantity: number, actor: Activity["actor"] = "Agent") {
