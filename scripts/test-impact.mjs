@@ -19,7 +19,7 @@ export function selectTargets(files) {
   for (const file of files) {
     if (isFullGateChange(file)) return ["test-all"];
 
-    if (file.startsWith("src/domain/") || file.startsWith("src/store/") || file.startsWith("src/webmcp/")) {
+    if (file.startsWith("src/commerce/") || file.startsWith("src/domain/") || file.startsWith("src/store/") || file.startsWith("src/webmcp/")) {
       targets.add("test-coverage");
       targets.add("build");
       targets.add("test-smoke");

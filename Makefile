@@ -1,4 +1,4 @@
-.PHONY: help install verify-diff check build test test-unit test-adversarial test-infrastructure test-coverage test-smoke test-fast test-all test-affected ci
+.PHONY: help install verify-diff check build test test-unit test-adversarial test-infrastructure test-coverage test-smoke test-fast test-all test-affected shopify-read ci
 
 BASE_REF ?= origin/main
 
@@ -16,6 +16,7 @@ help:
 	@echo "  make test-coverage      Unit + adversarial suite with scoped thresholds"
 	@echo "  make test-all           Complete merge gate"
 	@echo "  make test-affected      Select tests from changes vs BASE_REF=$(BASE_REF)"
+	@echo "  make shopify-read       Read one configured Shopify dev-store product (no write)"
 
 install:
 	pnpm install --frozen-lockfile
@@ -52,5 +53,8 @@ test-all: verify-diff check test-infrastructure test-coverage build test-smoke
 
 test-affected:
 	node scripts/test-affected.mjs --base "$(BASE_REF)"
+
+shopify-read:
+	pnpm shopify:read
 
 ci: test-all

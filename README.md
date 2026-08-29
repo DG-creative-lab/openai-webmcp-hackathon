@@ -61,6 +61,21 @@ pnpm test
 pnpm build
 ```
 
+### Optional Shopify dev-store read
+
+The public demo continues to use the deterministic fixture and needs no credentials. To prove the same commerce contract against one real, single-variant Shopify dev-store product, copy `.env.example` to a local ignored environment file, add a server-side Admin API token with `read_products`, load those values into your shell, and run:
+
+```bash
+cp .env.example .env.local
+# Edit .env.local, then load it in zsh/bash:
+set -a
+source .env.local
+set +a
+make shopify-read
+```
+
+The command calls the version-pinned Shopify Admin GraphQL endpoint, validates the configured product identity and GBP contract fields, and prints a `conversion-lab.commerce.v1` snapshot with live provenance and a read receipt. `SHOPIFY_METAFIELDS` is an optional comma-separated `namespace:key` allowlist; only selected metafields may become evidence. The access token is sent only in the server-side request header and is never included in the snapshot or normalized error messages. This slice is read-only: it performs no `productUpdate`, approval, rollback, Ads activation, or spend action.
+
 ## Quality workflow
 
 Create work on `feature/<short-name>` or `fix/<short-name>` branches. Use `make test-affected BASE_REF=origin/main` while iterating and `make test-all` before opening a pull request. Pull requests to `main` run the complete deterministic gate; branch pushes receive change-aware feedback.
@@ -82,7 +97,7 @@ The reset control is deliberately absent from the WebMCP site-tool surface. It r
 
 ## Product boundaries
 
-This first slice uses a deterministic, local evidence and evaluation engine so judges can verify the product without Shopify or Ads credentials. The production extension points are clear: Shopify Admin API ingestion/publication, OpenAI Ads campaign management and Delta Feed updates after merchant onboarding, measurement events, and a configurable intent-evaluation library.
+The judge-facing application uses a deterministic, local evidence and evaluation engine so it remains verifiable without Shopify or Ads credentials. An optional server-side dev-store reader now proves Shopify Admin API ingestion through the same versioned product, evidence, provenance, identity and receipt contracts. Live Shopify publication remains a separate governed slice; the other production extension points include OpenAI Ads campaign management and Delta Feed updates after merchant onboarding, measurement events, and a configurable intent-evaluation library.
 
 The OpenAI Ads projection includes the documented core file-upload fields, marks the item Ads-eligible, and truthfully sets `identifier_exists` to `no` for this fictional product. An independent local validator checks required fields, identifier rules, URL syntax, price format and supported availability. It cannot prove URL reachability, merchant/feed configuration, or acceptance by OpenAI processing, and the UI reports those limits. Initial feed connection and catalogue upload happen through Ads Manager and SFTP rather than the public Advertiser API; the credential-free demo never pretends to provision a feed or activate spend.
 
@@ -92,4 +107,6 @@ The OpenAI Ads projection includes the documented core file-upload fields, marks
 - [OpenAI Ads API overview](https://developers.openai.com/ads/api-overview)
 - [OpenAI Ads product feeds](https://developers.openai.com/ads/product-feeds)
 - [OpenAI product-feed file specification](https://developers.openai.com/commerce/specs/file-upload/products)
+- [Shopify Admin GraphQL API](https://shopify.dev/docs/api/admin-graphql/latest)
+- [Shopify Admin API access tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens)
 - [OpenAI WebMCP Challenge](https://openai.com/webmcp-challenge/)
