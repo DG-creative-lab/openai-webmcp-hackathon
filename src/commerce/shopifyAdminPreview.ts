@@ -1,9 +1,12 @@
 import {
   COMMERCE_CONTRACT_VERSION,
+  type ApprovalEnvelope,
   type ChannelProjection,
-  type CommerceCopy,
   type CommerceIdentity,
+  type EvidenceRecord,
+  type RepresentationVariant,
 } from "./contracts";
+import { assertApprovalBinding } from "./approvalBinding";
 
 export const SHOPIFY_ADMIN_API_VERSION = "2026-07" as const;
 
@@ -49,7 +52,9 @@ export type ShopifyOperationPreview = ChannelProjection<ShopifyGraphQLPayload> &
 
 function assertShopDomain(shopDomain: string): string {
   const normalized = shopDomain.trim().toLowerCase();
-  if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(normalized)) {
+  const suffix = ".myshopify.com";
+  const shopLabel = normalized.endsWith(suffix) ? normalized.slice(0, -suffix.length) : "";
+  if (shopLabel.length < 1 || shopLabel.length > 63 || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(shopLabel)) {
     throw new Error("Invalid Shopify shop domain: expected a canonical *.myshopify.com hostname.");
   }
   return normalized;
@@ -95,16 +100,16 @@ export function previewShopifyProductRead(shopDomain: string, productId: string)
 }
 
 export function previewShopifyProductUpdate(input: {
-  shopDomain: string;
-  productId: string;
-  approvedDigest: string;
-  copy: CommerceCopy;
+  approval: Readonly<ApprovalEnvelope>;
+  representation: Readonly<RepresentationVariant>;
+  evidence: readonly EvidenceRecord[];
 }): ShopifyOperationPreview {
-  const previewTarget = target(input.shopDomain, input.productId);
-  if (!/^fnv1a-[a-f0-9]{8}$/.test(input.approvedDigest)) {
-    throw new Error("Shopify update preview blocked: a current approved payload digest is required.");
+  if (input.approval.target.provider !== "shopify") {
+    throw new Error("Shopify update preview blocked: approval must target a Shopify product identity.");
   }
-  if (!input.copy.title.trim() || !input.copy.description.trim()) {
+  const previewTarget = target(input.approval.target.storeId, input.approval.target.productId);
+  const approvedDigest = assertApprovalBinding(input);
+  if (!input.representation.copy.title.trim() || !input.representation.copy.description.trim()) {
     throw new Error("Shopify update preview blocked: title and description must be non-empty.");
   }
 
@@ -116,7 +121,7 @@ export function previewShopifyProductUpdate(input: {
     operation: "update_product",
     apiVersion: SHOPIFY_ADMIN_API_VERSION,
     target: previewTarget,
-    payloadDigest: input.approvedDigest,
+    payloadDigest: approvedDigest,
     externalWrite: false,
     payload: {
       method: "POST",
@@ -125,8 +130,8 @@ export function previewShopifyProductUpdate(input: {
       variables: {
         product: {
           id: previewTarget.productId,
-          title: input.copy.title,
-          descriptionHtml: input.copy.description,
+          title: input.representation.copy.title,
+          descriptionHtml: input.representation.copy.description,
         },
       },
       requiredScopes: ["write_products"],

@@ -264,10 +264,10 @@ export async function registerWebMCPTools(): Promise<boolean> {
         const state = appStore.getState();
         const visibleCopy = state.variant.status === "published" ? state.variant : state.product.baseline;
         const representedEvidence = new Set(
-          evaluateCopy(visibleCopy, state.evidence, "Current visible representation").results
+          evaluateCopy(visibleCopy, state.evidence, "Current visible representation", state.commerce.sourceIdentity).results
             .flatMap((result) => result.matched && result.evidenceId ? [result.evidenceId] : []),
         );
-        const result = evaluateShopperNeed(query, state.product, state.evidence, representedEvidence);
+        const result = evaluateShopperNeed(query, state.product, state.evidence, representedEvidence, state.commerce.sourceIdentity);
         return success(effects.read, {
           product: state.product.id,
           match: result.match,

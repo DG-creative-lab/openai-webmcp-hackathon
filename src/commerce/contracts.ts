@@ -49,13 +49,13 @@ export interface EvidenceRecord {
 }
 
 export interface RepresentationVariant {
-  contractVersion: CommerceContractVersion;
-  id: string;
-  productIdentity: CommerceIdentity;
-  copy: CommerceCopy;
-  evidenceIds: string[];
-  payloadDigest: string;
-  status: "draft" | "staged" | "approved" | "published";
+  readonly contractVersion: CommerceContractVersion;
+  readonly id: string;
+  readonly productIdentity: Readonly<CommerceIdentity>;
+  readonly copy: Readonly<CommerceCopy> & { readonly bullets: readonly string[] };
+  readonly evidenceIds: readonly string[];
+  readonly payloadDigest: string;
+  readonly status: "draft" | "staged" | "approved" | "published";
 }
 
 export interface EvaluationResult {
@@ -68,15 +68,15 @@ export interface EvaluationResult {
 }
 
 export interface ApprovalEnvelope {
-  contractVersion: CommerceContractVersion;
-  assurance: "demo_ui_gesture" | "authenticated_merchant";
-  principalId: string | null;
-  target: CommerceIdentity;
-  payloadDigest: string;
-  evidenceIds: string[];
-  policyVersion: string;
-  approvedAt: string;
-  expiresAt: string | null;
+  readonly contractVersion: CommerceContractVersion;
+  readonly assurance: "demo_ui_gesture" | "authenticated_merchant";
+  readonly principalId: string | null;
+  readonly target: Readonly<CommerceIdentity>;
+  readonly payloadDigest: string;
+  readonly evidenceIds: readonly string[];
+  readonly policyVersion: string;
+  readonly approvedAt: string;
+  readonly expiresAt: string | null;
 }
 
 export interface ChannelProjection<TPayload = unknown> {

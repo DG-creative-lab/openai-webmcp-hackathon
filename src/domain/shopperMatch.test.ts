@@ -8,7 +8,7 @@ describe("shopper constraint evaluation", () => {
   function evaluate(query: string, represented = true) {
     const state = appStore.getState();
     const representedEvidence = new Set(represented ? state.evidence.map((item) => item.id) : []);
-    return evaluateShopperNeed(query, state.product, state.evidence, representedEvidence);
+    return evaluateShopperNeed(query, state.product, state.evidence, representedEvidence, state.commerce.sourceIdentity);
   }
 
   it.each([

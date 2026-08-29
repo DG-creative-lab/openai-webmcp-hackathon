@@ -12,12 +12,17 @@ describe("demo lifecycle boundary", () => {
     expect(appStore.getState().commerce).toMatchObject({
       mode: "fixture",
       contractVersion: "conversion-lab.commerce.v1",
-      sourceIdentity: { provider: "fixture", storeId: "fieldwork-demo.myshopify.com", productId: "gid://shopify/Product/108828309" },
+      sourceIdentity: { provider: "shopify", storeId: "fieldwork-demo.myshopify.com", productId: "gid://shopify/Product/108828309" },
       readReceipt: { status: "simulated", externalEffect: false },
       readPreview: { operation: "read_product", externalWrite: false },
       updatePreview: null,
     });
     expect(() => appStore.runEvaluation("Agent")).toThrow(/create an evidence-led draft/i);
+    expect(appStore.getState().evidence[0]).toMatchObject({
+      contractVersion: "conversion-lab.commerce.v1",
+      productIdentity: { provider: "shopify", productId: "gid://shopify/Product/108828309" },
+      provenance: { observedAt: expect.any(String), freshness: "fixture" },
+    });
   });
 
   it("blocks publication before exact digest-bound approval state", () => {
@@ -28,7 +33,14 @@ describe("demo lifecycle boundary", () => {
     appStore.generateVariant("Agent");
     expect(appStore.runEvaluation("Agent").score).toBe(8);
     expect(appStore.stageVariant("Agent").status).toBe("staged");
-    expect(appStore.recordVisibleApproval().approvedDigest).toMatch(/^fnv1a-/);
+    const approved = appStore.recordVisibleApproval();
+    expect(approved.approvedDigest).toMatch(/^fnv1a-/);
+    expect(approved.approval).toMatchObject({
+      target: approved.productIdentity,
+      payloadDigest: approved.approvedDigest,
+      evidenceIds: approved.evidenceIds,
+      assurance: "demo_ui_gesture",
+    });
     const published = appStore.publishVariant("Agent");
     expect(published.status).toBe("published");
     expect(appStore.getState().commerce.updatePreview).toMatchObject({

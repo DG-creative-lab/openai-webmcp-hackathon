@@ -109,6 +109,18 @@ describe("adversarial authority and lifecycle boundaries", () => {
     expect(appStore.getState().variant.title).toBe(originalTitle);
   });
 
+  it("keeps the approval envelope, target, and evidence set immutable after recording", () => {
+    reach("approved");
+    const approval = appStore.getState().variant.approval;
+    expect(approval).not.toBeNull();
+    expect(Object.isFrozen(approval)).toBe(true);
+    expect(Object.isFrozen(approval?.target)).toBe(true);
+    expect(Object.isFrozen(approval?.evidenceIds)).toBe(true);
+    expect(() => {
+      (approval?.target as { productId: string }).productId = "gid://shopify/Product/999";
+    }).toThrow(TypeError);
+  });
+
   it.each([
     [Number.NaN, 0],
     [Number.POSITIVE_INFINITY, 0],

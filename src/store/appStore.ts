@@ -1,11 +1,18 @@
 import { createFieldworkFixtureSnapshot } from "../commerce/fieldworkFixture";
+import { assertApprovalBinding, assertEvidenceAuthority, digestApprovalPayload } from "../commerce/approvalBinding";
 import { previewShopifyProductRead, previewShopifyProductUpdate } from "../commerce/shopifyAdminPreview";
-import { digestVariant, evaluateCopy } from "../domain/evaluation";
+import { COMMERCE_CONTRACT_VERSION, type ApprovalEnvelope, type EvidenceRecord, type RepresentationVariant } from "../commerce/contracts";
+import { evaluateCopy } from "../domain/evaluation";
 import { validateOpenAIProductFeedRow } from "../domain/openaiProductFeed";
 import type { Activity, AppState, OpenAIProductFeedRow, ProductCopy, Surface } from "../domain/types";
 
 const commerceSnapshot = createFieldworkFixtureSnapshot();
-const evidence = commerceSnapshot.evidence.map(({ id, label, value, source, verified, tags }) => ({ id, label, value, source, verified, tags: [...tags] }));
+const evidence: EvidenceRecord[] = commerceSnapshot.evidence.map((record) => ({
+  ...record,
+  productIdentity: { ...record.productIdentity },
+  tags: [...record.tags],
+  provenance: { ...record.provenance },
+}));
 const product = {
   id: commerceSnapshot.product.identity.productId,
   sku: commerceSnapshot.product.sku,
@@ -28,17 +35,20 @@ const variantCopy: ProductCopy = {
   ],
 };
 
-const baselineEvaluation = evaluateCopy(product.baseline, evidence, "Current Shopify copy");
+const baselineEvaluation = evaluateCopy(product.baseline, evidence, "Current Shopify copy", commerceSnapshot.product.identity);
 
 function initialVariant(): AppState["variant"] {
   return {
+    contractVersion: COMMERCE_CONTRACT_VERSION,
     id: "variant-urban-24-v1",
+    productIdentity: { ...commerceSnapshot.product.identity },
     ...product.baseline,
     bullets: [...product.baseline.bullets],
     status: "baseline",
     evidenceIds: evidence.map((item) => item.id),
     approvedDigest: null,
     approvedAt: null,
+    approval: null,
     publishedAt: null,
   };
 }
@@ -119,6 +129,32 @@ function addActivity(current: AppState, actor: Activity["actor"], action: string
   return [activity(actor, action, detail), ...current.activities].slice(0, 12);
 }
 
+function evidenceForVariant(current: AppState): EvidenceRecord[] {
+  const byId = new Map(current.evidence.map((record) => [record.id, record]));
+  const selected = current.variant.evidenceIds.flatMap((id) => {
+    const record = byId.get(id);
+    return record ? [record] : [];
+  });
+  assertEvidenceAuthority(selected, current.variant.productIdentity, current.variant.evidenceIds);
+  return selected;
+}
+
+function representationFor(current: AppState, payloadDigest: string): RepresentationVariant {
+  return {
+    contractVersion: current.variant.contractVersion,
+    id: current.variant.id,
+    productIdentity: current.variant.productIdentity,
+    copy: {
+      title: current.variant.title,
+      description: current.variant.description,
+      bullets: current.variant.bullets,
+    },
+    evidenceIds: current.variant.evidenceIds,
+    payloadDigest,
+    status: current.variant.status === "published" ? "published" : "approved",
+  };
+}
+
 export const appStore = {
   getState: () => state,
   subscribe(listener: () => void) {
@@ -140,6 +176,7 @@ export const appStore = {
         status: "draft",
         approvedDigest: null,
         approvedAt: null,
+        approval: null,
         publishedAt: null,
       },
       variantEvaluation: null,
@@ -152,7 +189,7 @@ export const appStore = {
     if (state.variant.status !== "draft") {
       throw new Error("Evaluation blocked: create an evidence-led draft first.");
     }
-    const evaluation = evaluateCopy(state.variant, state.evidence, "Evidence-led variant");
+    const evaluation = evaluateCopy(state.variant, state.evidence, "Evidence-led variant", state.variant.productIdentity);
     update((current) => ({
       ...current,
       variantEvaluation: evaluation,
@@ -166,29 +203,44 @@ export const appStore = {
     }
     return update((current) => ({
       ...current,
-      variant: { ...current.variant, status: "staged", approvedDigest: null, approvedAt: null },
+      variant: { ...current.variant, status: "staged", approvedDigest: null, approvedAt: null, approval: null },
       activities: addActivity(current, actor, "Variant staged", "The tested variant is ready at the visible review checkpoint; no live channel changed."),
     })).variant;
   },
   recordVisibleApproval() {
     if (state.variant.status !== "staged") throw new Error("Only a staged variant can be approved.");
-    const approvedDigest = digestVariant(state.variant, state.variant.evidenceIds);
+    const approvedEvidence = evidenceForVariant(state);
+    const approvedDigest = digestApprovalPayload({ target: state.variant.productIdentity, copy: state.variant, evidence: approvedEvidence });
+    const approvedAt = new Date().toISOString();
+    const approval: ApprovalEnvelope = {
+      contractVersion: state.variant.contractVersion,
+      assurance: "demo_ui_gesture",
+      principalId: null,
+      target: state.variant.productIdentity,
+      payloadDigest: approvedDigest,
+      evidenceIds: [...state.variant.evidenceIds],
+      policyVersion: "conversion-lab.demo-approval.v1",
+      approvedAt,
+      expiresAt: null,
+    };
     return update((current) => ({
       ...current,
-      variant: { ...current.variant, status: "approved", approvedDigest, approvedAt: new Date().toISOString() },
+      variant: { ...current.variant, status: "approved", approvedDigest, approvedAt, approval },
       activities: addActivity(current, "Browser user", "Visible approval recorded", `Browser UI gesture bound to ${approvedDigest}; this credential-free demo does not authenticate the actor.`),
     })).variant;
   },
   publishVariant(actor: Activity["actor"] = "Agent") {
-    const currentDigest = digestVariant(state.variant, state.variant.evidenceIds);
-    if (state.variant.status !== "approved" || state.variant.approvedDigest !== currentDigest) {
+    const approvedEvidence = evidenceForVariant(state);
+    const currentDigest = digestApprovalPayload({ target: state.variant.productIdentity, copy: state.variant, evidence: approvedEvidence });
+    if (state.variant.status !== "approved" || !state.variant.approval || state.variant.approvedDigest !== currentDigest) {
       throw new Error("Publication blocked: this exact variant does not have current digest-bound approval state.");
     }
+    const representation = representationFor(state, currentDigest);
+    assertApprovalBinding({ approval: state.variant.approval, representation, evidence: approvedEvidence });
     const updatePreview = previewShopifyProductUpdate({
-      shopDomain: state.commerce.sourceIdentity.storeId,
-      productId: state.commerce.sourceIdentity.productId,
-      approvedDigest: currentDigest,
-      copy: state.variant,
+      approval: state.variant.approval,
+      representation,
+      evidence: approvedEvidence,
     });
     return update((current) => ({
       ...current,
@@ -198,10 +250,12 @@ export const appStore = {
     })).variant;
   },
   prepareAds(actor: Activity["actor"] = "Agent") {
-    const currentDigest = digestVariant(state.variant, state.variant.evidenceIds);
-    if (state.variant.status !== "published" || state.variant.approvedDigest !== currentDigest) {
+    const approvedEvidence = evidenceForVariant(state);
+    const currentDigest = digestApprovalPayload({ target: state.variant.productIdentity, copy: state.variant, evidence: approvedEvidence });
+    if (state.variant.status !== "published" || !state.variant.approval || state.variant.approvedDigest !== currentDigest) {
       throw new Error("Ads preparation blocked: publish the exact digest-approved variant first.");
     }
+    assertApprovalBinding({ approval: state.variant.approval, representation: representationFor(state, currentDigest), evidence: approvedEvidence });
     const copy = state.variant;
     const feed: OpenAIProductFeedRow = {
       id: state.product.sku,

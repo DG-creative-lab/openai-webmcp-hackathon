@@ -7,7 +7,7 @@ import {
 
 const observedAt = "2026-08-28T00:00:00.000Z";
 const identity: CommerceIdentity = {
-  provider: "fixture",
+  provider: "shopify",
   storeId: "fieldwork-demo.myshopify.com",
   productId: "gid://shopify/Product/108828309",
 };

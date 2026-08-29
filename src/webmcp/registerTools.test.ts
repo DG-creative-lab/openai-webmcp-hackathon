@@ -57,10 +57,16 @@ describe("WebMCP registration", () => {
       return tool.execute(input);
     };
 
-    await expect(execute("get_growth_workspace")).resolves.toMatchObject({
+    const workspaceResult = await execute("get_growth_workspace") as { evidence: Array<Record<string, unknown>> };
+    expect(workspaceResult).toMatchObject({
       ok: true,
       effect: { class: "read", changedState: false, externalWrite: false },
       workspace: { cartQuantity: 0, variant: { status: "baseline" } },
+    });
+    expect(workspaceResult.evidence[0]).toMatchObject({
+      contractVersion: "conversion-lab.commerce.v1",
+      productIdentity: { provider: "shopify", productId: "gid://shopify/Product/108828309" },
+      provenance: { observedAt: expect.any(String), freshness: "fixture" },
     });
     await expect(execute("audit_channel_readiness")).resolves.toMatchObject({
       effect: { class: "read" },
