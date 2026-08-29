@@ -38,7 +38,7 @@ export interface ShopifyProductReadInput {
 
 const SHOPIFY_PRODUCT_READ_QUERY = `query ConversionLabProductRead(
   $id: ID!
-  $metafieldIdentifiers: [HasMetafieldsIdentifier!]!
+  $metafieldKeys: [String!]
 ) {
   shop { currencyCode }
   product(id: $id) {
@@ -54,7 +54,7 @@ const SHOPIFY_PRODUCT_READ_QUERY = `query ConversionLabProductRead(
       ... on MediaImage { image { url altText } }
     }
     variants(first: 2) { nodes { id sku price inventoryQuantity } }
-    metafields(first: 20, identifiers: $metafieldIdentifiers) {
+    metafields(first: 20, keys: $metafieldKeys) {
       nodes { id namespace key value type updatedAt }
     }
   }
@@ -334,7 +334,7 @@ export async function readShopifyProduct(input: ShopifyProductReadInput): Promis
         query: SHOPIFY_PRODUCT_READ_QUERY,
         variables: {
           id: target.productId,
-          metafieldIdentifiers: selectors,
+          metafieldKeys: selectors.map(({ namespace, key }) => `${namespace}.${key}`),
         },
       }),
     });

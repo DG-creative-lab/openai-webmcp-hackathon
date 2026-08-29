@@ -77,13 +77,13 @@ describe("Shopify dev-store product reader", () => {
     expect(body).toMatchObject({
       variables: {
         id: productId,
-        metafieldIdentifiers: [
-          { namespace: "custom", key: "waterproof_rating" },
-          { namespace: "custom", key: "laptop_size" },
-        ],
+        metafieldKeys: ["custom.waterproof_rating", "custom.laptop_size"],
       },
     });
     expect(body.query).toContain("query ConversionLabProductRead");
+    expect(body.query).toContain("$metafieldKeys: [String!]");
+    expect(body.query).toContain("metafields(first: 20, keys: $metafieldKeys)");
+    expect(body.query).not.toMatch(/HasMetafieldsIdentifier|identifiers\s*:/);
 
     expect(snapshot).toMatchObject({
       contractVersion: "conversion-lab.commerce.v1",
