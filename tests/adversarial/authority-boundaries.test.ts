@@ -116,9 +116,13 @@ describe("adversarial authority and lifecycle boundaries", () => {
     expect(approval).not.toBeNull();
     expect(Object.isFrozen(approval)).toBe(true);
     expect(Object.isFrozen(approval?.target)).toBe(true);
+    expect(Object.isFrozen(approval?.productSnapshot)).toBe(true);
     expect(Object.isFrozen(approval?.evidenceIds)).toBe(true);
     expect(() => {
       (approval?.target as { productId: string }).productId = "gid://shopify/Product/999";
+    }).toThrow(TypeError);
+    expect(() => {
+      (approval?.productSnapshot as { price: number }).price = 1;
     }).toThrow(TypeError);
   });
 

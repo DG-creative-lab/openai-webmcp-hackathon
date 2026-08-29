@@ -88,6 +88,7 @@ export function validateOpenAIProductFeedRow(row: Partial<OpenAIProductFeedRow>,
   if (row.identifier_exists !== "no" && !row.gtin?.trim() && !row.mpn?.trim()) errors.push("required:gtin_or_mpn");
   if (row.identifier_exists === "no" && (row.gtin?.trim() || row.mpn?.trim())) errors.push("conflict:identifier_exists");
   if (row.gtin && !/^\d{8,14}$/.test(row.gtin)) errors.push("format:gtin");
+  if (row.mpn && row.mpn.length > 70) errors.push("length:mpn");
   if (row.is_ads_eligible !== true) errors.push("value:is_ads_eligible");
 
   return {

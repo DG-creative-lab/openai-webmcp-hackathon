@@ -40,6 +40,15 @@ describe("demo lifecycle boundary", () => {
       payloadDigest: approved.approvedDigest,
       evidenceIds: approved.evidenceIds,
       assurance: "demo_ui_gesture",
+      productSnapshot: {
+        sku: "URB-24-BLK",
+        brand: "Fieldwork Supply",
+        price: 159,
+        currency: "GBP",
+        inventory: 18,
+        productUrl: "https://conversion-lab-webmcp.vercel.app/",
+        imageUrl: "https://conversion-lab-webmcp.vercel.app/commuter-pack.png",
+      },
     });
     const published = await appStore.publishVariant("Agent");
     expect(published.status).toBe("published");

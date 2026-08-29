@@ -14,7 +14,7 @@ Conversion Lab makes that gap measurable. It:
 2. Generates an evidence-bound product variant.
 3. Runs eight deterministic buyer-intent tasks.
 4. Stages the result at a visible browser review checkpoint.
-5. Binds the demo approval state with a versioned SHA-256 digest over the canonical product target, exact copy, complete evidence content, tags and provenance.
+5. Binds the demo approval state with a versioned SHA-256 digest over the canonical product target, feed-bearing commercial snapshot, exact copy, complete evidence content, tags and provenance.
 6. Publishes only that digest-approved version to the demo storefront.
 7. Produces a digest-bound, locally schema-validated OpenAI Ads CSV feed export and **PAUSED** campaign projection.
 
@@ -39,7 +39,7 @@ Every input schema is narrow and rejects additional properties. Read-only tools 
 ## Authority model
 
 - Site tools may read evidence, draft, evaluate and stage; no approval or reset site tool is registered.
-- The visible browser interface records the demo approval gesture in a deeply frozen envelope bound by a `sha256-v1` Web Crypto digest to the canonical Shopify product target, exact copy, complete runtime-validated evidence content, tags and provenance.
+- The visible browser interface records the demo approval gesture in a deeply frozen envelope bound by a `sha256-v1` Web Crypto digest to the canonical Shopify product target, feed-bearing commercial snapshot (SKU, brand, price, currency, inventory and destination URLs), exact copy, complete runtime-validated evidence content, tags and provenance.
 - This credential-free demo does not authenticate the browser actor and therefore does not claim enforced human or merchant-only authority. A production Shopify write requires an authenticated merchant grant bound to the same target and digest.
 - Publishing fails if approval is missing or stale.
 - The Ads integration is deliberately a projection: no credential, SFTP upload, external API write, activation or spend path exists in this demo.
@@ -119,7 +119,7 @@ The reset control is deliberately absent from the WebMCP site-tool surface. It r
 
 The judge-facing application uses a deterministic, local evidence and evaluation engine so it remains verifiable without Shopify or Ads credentials. An optional server-side dev-store reader now proves Shopify Admin API ingestion through the same versioned product, evidence, provenance, identity and receipt contracts. Live Shopify publication remains a separate governed slice; the other production extension points include OpenAI Ads campaign management and Delta Feed updates after merchant onboarding, measurement events, and a configurable intent-evaluation library.
 
-The OpenAI Ads projection includes the documented Google-compatible core fields, marks the item Ads-eligible, and truthfully sets `identifier_exists` to `no` for this fictional product. An independent local validator checks required fields, identifier rules, field lengths, credential-free URL syntax, price format and supported availability. The app serializes the exact approved row into a deterministic UTF-8 CSV, records both the approval payload digest and file-content digest, and offers the artifact for local download. It cannot prove URL reachability, merchant/feed configuration, SFTP transfer, or acceptance by OpenAI processing, and the UI reports those limits. Initial feed connection and catalogue upload happen through Ads Manager and SFTP rather than the public Advertiser API; the credential-free demo never pretends to provision a feed or activate spend.
+The OpenAI Ads projection includes the documented Google-compatible core fields, marks the item Ads-eligible, and truthfully sets `identifier_exists` to `no` for this fictional product. An independent local validator checks required fields, identifier rules (including the 70-character MPN limit), field lengths, credential-free URL syntax, price format and supported availability. Every exported commercial field is derived from the product snapshot inside the approval envelope; the projection accepts no separate product object that could substitute SKU, brand, price, inventory-derived availability or URLs. The app serializes the exact approved row into a deterministic UTF-8 CSV, records both the approval payload digest and file-content digest, and offers the artifact for local download. It cannot prove URL reachability, merchant/feed configuration, SFTP transfer, or acceptance by OpenAI processing, and the UI reports those limits. Initial feed connection and catalogue upload happen through Ads Manager and SFTP rather than the public Advertiser API; the credential-free demo never pretends to provision a feed or activate spend.
 
 ## References
 

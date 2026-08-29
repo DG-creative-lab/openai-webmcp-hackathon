@@ -62,5 +62,8 @@ describe("OpenAI Ads Google-compatible feed export", () => {
   it("fails closed for empty feeds or invalid rows", async () => {
     await expect(serializeOpenAIAdsFeedRows({ rows: [] })).rejects.toThrow(/at least one product row/i);
     await expect(serializeOpenAIAdsFeedRows({ rows: [{ ...validRow, is_ads_eligible: false as never }] })).rejects.toThrow(/value:is_ads_eligible/i);
+    await expect(serializeOpenAIAdsFeedRows({
+      rows: [{ ...validRow, identifier_exists: "yes", mpn: "X".repeat(71) }],
+    })).rejects.toThrow(/length:mpn/i);
   });
 });

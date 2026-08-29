@@ -1,6 +1,7 @@
 import {
   COMMERCE_CONTRACT_VERSION,
   type ApprovalEnvelope,
+  type ApprovalProductSnapshot,
   type CommerceCopy,
   type CommerceIdentity,
   type EvidenceRecord,
@@ -13,6 +14,49 @@ function sameIdentity(left: Readonly<CommerceIdentity>, right: Readonly<Commerce
 
 function canonicalIdentity(identity: Readonly<CommerceIdentity>) {
   return { provider: identity.provider, storeId: identity.storeId, productId: identity.productId };
+}
+
+function isCredentialFreeHttpUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+function canonicalProductSnapshot(value: Readonly<ApprovalProductSnapshot>): ApprovalProductSnapshot {
+  if (!value || typeof value !== "object") {
+    throw new Error("Approval blocked: the feed-bearing product snapshot is missing.");
+  }
+  if (typeof value.sku !== "string" || !value.sku.trim() || value.sku.length > 100) {
+    throw new Error("Approval blocked: the product snapshot SKU is invalid.");
+  }
+  if (typeof value.brand !== "string" || !value.brand.trim() || value.brand.length > 70) {
+    throw new Error("Approval blocked: the product snapshot brand is invalid.");
+  }
+  if (typeof value.price !== "number" || !Number.isFinite(value.price) || value.price <= 0) {
+    throw new Error("Approval blocked: the product snapshot price is invalid.");
+  }
+  if (value.currency !== "GBP") {
+    throw new Error("Approval blocked: the product snapshot currency is unsupported.");
+  }
+  if (typeof value.inventory !== "number" || !Number.isInteger(value.inventory) || value.inventory < 0) {
+    throw new Error("Approval blocked: the product snapshot inventory is invalid.");
+  }
+  if (!isCredentialFreeHttpUrl(value.productUrl) || !isCredentialFreeHttpUrl(value.imageUrl)) {
+    throw new Error("Approval blocked: the product snapshot URLs are invalid.");
+  }
+  return {
+    sku: value.sku,
+    brand: value.brand,
+    price: value.price,
+    currency: value.currency,
+    inventory: value.inventory,
+    productUrl: value.productUrl,
+    imageUrl: value.imageUrl,
+  };
 }
 
 function isValidObservedAt(value: unknown): value is string {
@@ -104,6 +148,7 @@ export function assertEvidenceAuthority(
 
 export async function digestApprovalPayload(input: {
   target: Readonly<CommerceIdentity>;
+  productSnapshot: Readonly<ApprovalProductSnapshot>;
   copy: Readonly<CommerceCopy> & { readonly bullets: readonly string[] };
   evidence: readonly EvidenceRecord[];
 }): Promise<string> {
@@ -111,6 +156,7 @@ export async function digestApprovalPayload(input: {
     digestVersion: "sha256-v1",
     contractVersion: COMMERCE_CONTRACT_VERSION,
     target: canonicalIdentity(input.target),
+    productSnapshot: canonicalProductSnapshot(input.productSnapshot),
     copy: {
       title: input.copy.title,
       description: input.copy.description,
@@ -139,7 +185,12 @@ export async function assertApprovalBinding(input: {
     throw new Error("Approval blocked: the approval and representation use different evidence sets.");
   }
   assertEvidenceAuthority(evidence, approval.target, approval.evidenceIds);
-  const expectedDigest = await digestApprovalPayload({ target: approval.target, copy: representation.copy, evidence });
+  const expectedDigest = await digestApprovalPayload({
+    target: approval.target,
+    productSnapshot: approval.productSnapshot,
+    copy: representation.copy,
+    evidence,
+  });
   if (approval.payloadDigest !== expectedDigest || representation.payloadDigest !== expectedDigest) {
     throw new Error("Approval blocked: target, copy, evidence provenance, or payload digest changed after approval.");
   }

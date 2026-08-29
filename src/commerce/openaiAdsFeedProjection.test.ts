@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { digestApprovalPayload } from "./approvalBinding";
-import { COMMERCE_CONTRACT_VERSION, type ApprovalEnvelope, type RepresentationVariant } from "./contracts";
+import { COMMERCE_CONTRACT_VERSION, type ApprovalEnvelope, type ApprovalProductSnapshot, type RepresentationVariant } from "./contracts";
 import { createFieldworkFixtureSnapshot } from "./fieldworkFixture";
 import { prepareOpenAIAdsFeedProjection } from "./openaiAdsFeedProjection";
 
@@ -11,13 +11,28 @@ async function approvedInput() {
     description: "Approved evidence-led description.",
     bullets: ["Verified proof"],
   };
+  const productSnapshot: ApprovalProductSnapshot = {
+    sku: snapshot.product.sku,
+    brand: snapshot.product.brand,
+    price: snapshot.product.price,
+    currency: snapshot.product.currency,
+    inventory: snapshot.product.inventory,
+    productUrl: "https://conversion-lab-webmcp.vercel.app/",
+    imageUrl: "https://conversion-lab-webmcp.vercel.app/commuter-pack.png",
+  };
   const evidenceIds = snapshot.evidence.map((record) => record.id);
-  const payloadDigest = await digestApprovalPayload({ target: snapshot.product.identity, copy, evidence: snapshot.evidence });
+  const payloadDigest = await digestApprovalPayload({
+    target: snapshot.product.identity,
+    productSnapshot,
+    copy,
+    evidence: snapshot.evidence,
+  });
   const approval: ApprovalEnvelope = {
     contractVersion: COMMERCE_CONTRACT_VERSION,
     assurance: "demo_ui_gesture",
     principalId: null,
     target: snapshot.product.identity,
+    productSnapshot,
     payloadDigest,
     evidenceIds,
     policyVersion: "conversion-lab.demo-approval.v1",
@@ -37,16 +52,6 @@ async function approvedInput() {
     approval,
     representation,
     evidence: snapshot.evidence,
-    product: {
-      identity: snapshot.product.identity,
-      sku: snapshot.product.sku,
-      brand: snapshot.product.brand,
-      price: snapshot.product.price,
-      currency: snapshot.product.currency,
-      inventory: snapshot.product.inventory,
-      productUrl: "https://conversion-lab-webmcp.vercel.app/",
-      imageUrl: "https://conversion-lab-webmcp.vercel.app/commuter-pack.png",
-    },
   };
 }
 
@@ -87,23 +92,62 @@ describe("approval-bound OpenAI Ads feed projection", () => {
     })).rejects.toThrow(/changed after approval/i);
   });
 
-  it("rejects a product source for another target before creating an artifact", async () => {
+  it("does not accept an independently substitutable product source at the projection boundary", async () => {
     const input = await approvedInput();
-    await expect(prepareOpenAIAdsFeedProjection({
-      ...input,
-      product: { ...input.product, identity: { ...input.product.identity, productId: "gid://shopify/Product/999" } },
-    })).rejects.toThrow(/product source does not match/i);
-  });
-
-  it("rejects invalid product fields and credential-bearing destination URLs", async () => {
-    const input = await approvedInput();
-    await expect(prepareOpenAIAdsFeedProjection({
+    const result = await prepareOpenAIAdsFeedProjection({
       ...input,
       product: {
-        ...input.product,
-        sku: "x".repeat(101),
-        productUrl: "https://user:secret@conversion-lab-webmcp.vercel.app/",
+        identity: input.approval.target,
+        sku: "SUBSTITUTED-SKU",
+        brand: "Substituted Brand",
+        price: 1,
+        currency: "GBP",
+        inventory: 0,
+        productUrl: "https://attacker.example/substituted",
+        imageUrl: "https://attacker.example/image.png",
       },
-    })).rejects.toThrow(/length:id|format:link/i);
+    } as Parameters<typeof prepareOpenAIAdsFeedProjection>[0] & { product: unknown });
+
+    expect(result.feed).toMatchObject({
+      id: input.approval.productSnapshot.sku,
+      brand: input.approval.productSnapshot.brand,
+      price: "159.00 GBP",
+      availability: "in_stock",
+      link: input.approval.productSnapshot.productUrl,
+      image_link: input.approval.productSnapshot.imageUrl,
+    });
+  });
+
+  it.each([
+    ["sku", "SUBSTITUTED-SKU"],
+    ["brand", "Substituted Brand"],
+    ["price", 1],
+    ["inventory", 0],
+    ["productUrl", "https://attacker.example/substituted"],
+    ["imageUrl", "https://attacker.example/image.png"],
+  ] as const)("rejects reuse of the old approval after %s changes", async (field, value) => {
+    const input = await approvedInput();
+    await expect(prepareOpenAIAdsFeedProjection({
+      ...input,
+      approval: {
+        ...input.approval,
+        productSnapshot: { ...input.approval.productSnapshot, [field]: value },
+      },
+    })).rejects.toThrow(/changed after approval/i);
+  });
+
+  it("fails closed for a missing or invalid approval product snapshot", async () => {
+    const input = await approvedInput();
+    await expect(prepareOpenAIAdsFeedProjection({
+      ...input,
+      approval: { ...input.approval, productSnapshot: undefined as never },
+    })).rejects.toThrow(/product snapshot is missing/i);
+    await expect(prepareOpenAIAdsFeedProjection({
+      ...input,
+      approval: {
+        ...input.approval,
+        productSnapshot: { ...input.approval.productSnapshot, productUrl: "https://user:secret@merchant.example/" },
+      },
+    })).rejects.toThrow(/snapshot URLs are invalid/i);
   });
 });

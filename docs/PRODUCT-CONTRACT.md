@@ -11,7 +11,7 @@ A judge can watch a generic listing move from 0/8 to 8/8 deterministic buyer-int
 ## Non-negotiable invariants
 
 1. No product claim without a verified evidence record.
-2. No demo publication without current approval state bound by a versioned SHA-256 digest to the exact product target, copy and runtime-validated provenance-bearing evidence; do not present the credential-free UI gesture as authenticated merchant authority.
+2. No demo publication without current approval state bound by a versioned SHA-256 digest to the exact product target, feed-bearing commercial snapshot, copy and runtime-validated provenance-bearing evidence; do not present the credential-free UI gesture as authenticated merchant authority.
 3. No paid campaign activation or spend.
 4. Every agent action changes the same state the merchant sees.
 5. Every important effect produces a visible activity event.

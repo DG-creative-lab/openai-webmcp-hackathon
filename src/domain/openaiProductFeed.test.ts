@@ -34,6 +34,19 @@ describe("OpenAI product-feed local schema validator", () => {
     expect(validateOpenAIProductFeedRow({ ...row, gtin: "123456789012" })).toMatchObject({ valid: true, errors: [] });
   });
 
+  it("accepts the 70-character MPN boundary and rejects 71 characters", () => {
+    expect(validateOpenAIProductFeedRow({
+      ...validRow,
+      identifier_exists: "yes",
+      mpn: "X".repeat(70),
+    })).toMatchObject({ valid: true, errors: [] });
+    expect(validateOpenAIProductFeedRow({
+      ...validRow,
+      identifier_exists: "yes",
+      mpn: "X".repeat(71),
+    })).toMatchObject({ valid: false, errors: expect.arrayContaining(["length:mpn"]) });
+  });
+
   it.each(["preorder", "backorder"] as const)("rejects %s without an availability date", (availability) => {
     expect(validateOpenAIProductFeedRow({ ...validRow, availability })).toMatchObject({
       valid: false,
