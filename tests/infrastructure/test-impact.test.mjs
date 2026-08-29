@@ -16,6 +16,15 @@ describe("change-impact selector", () => {
     ]);
   });
 
+  it("selects contract coverage, build and smoke for commerce adapter changes", () => {
+    assert.deepEqual(selectTargets(["src/commerce/shopifyAdminRead.ts"]), [
+      "verify-diff",
+      "test-coverage",
+      "build",
+      "test-smoke",
+    ]);
+  });
+
   it("selects build and browser evidence for UI changes", () => {
     assert.deepEqual(selectTargets(["src/App.tsx"]), [
       "verify-diff",

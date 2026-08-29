@@ -6,4 +6,7 @@ test-results/
 *.tsbuildinfo
 .DS_Store
 *.local
+.env
+.env.*
+!.env.example
 .playwright-mcp

@@ -21,7 +21,7 @@ Run `make test-affected BASE_REF=origin/main` for branch feedback. The selector 
 
 | Changed surface | Selected evidence |
 | --- | --- |
-| Domain, store, or WebMCP | Coverage, build, browser smoke |
+| Commerce adapters, domain, store, or WebMCP | Coverage, build, browser smoke |
 | React UI, CSS, HTML, public assets | Typecheck, build, browser smoke |
 | Adversarial tests | Adversarial suite |
 | Browser tests | Browser smoke |
