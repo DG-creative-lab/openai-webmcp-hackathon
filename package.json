@@ -16,6 +16,7 @@
     "test:infrastructure": "node --test tests/infrastructure/*.test.mjs",
     "test:coverage": "vitest run --coverage",
     "test:smoke": "playwright test",
+    "test:deployment": "playwright test --config playwright.deployment.config.ts",
     "shopify:read": "tsx scripts/shopify-dev-store-read.ts",
     "preview": "vite preview"
   },

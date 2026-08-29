@@ -11,6 +11,7 @@ The quality system is deliberately layered. Agents may help discover failure cas
 | Infrastructure | `make test-infrastructure` | Change-impact mapping and conservative fallback behavior | Seconds |
 | Coverage gate | `make test-coverage` | Unit and adversarial behavior across domain, store, and WebMCP control modules | Seconds |
 | Browser smoke | `make test-smoke` | Real page boot, tool discovery, shared session state, visible approval checkpoint, publication, Ads projection, shopper recommendation and cart | Under a minute |
+| Deployment smoke | `make test-deployment` | Production Vite output, static assets, and the complete Vercel-shaped browser journey | Under a minute |
 | Complete merge gate | `make test-all` | Diff hygiene, typecheck, coverage thresholds, production build and browser journey | Under a few minutes |
 
 Coverage is intentionally scoped to `src/commerce`, `src/domain`, `src/store`, and `src/webmcp/registerTools.ts`, where deterministic product, adapter and authority logic lives. The current thresholds are 85% statements, functions and lines, and 75% branches. The browser suite supplies behavioral evidence for React composition; these numbers are not presented as whole-system coverage.
@@ -46,3 +47,5 @@ This gives granular feedback during development while retaining a macro-level pr
 The `$webmcp-quality-harness` skill in `.agents/skills` gives future Codex sessions the product invariants, selection rules and evidence-reporting standard. It may design or diagnose tests; it cannot approve variants, authorize external effects, lower a gate, or replace deterministic CI.
 
 The browser smoke test supplies a standards-shaped `document.modelContext` host before the app loads. It verifies that the nine tools are discoverable and executable in one shared page session. Its scripted click at the approval checkpoint is synthetic test setup, not evidence of human identity or authorization. The actual Codex in-app-browser journey remains a separate acceptance check for the browser's native WebMCP implementation.
+
+The deployment smoke serves the generated `dist` directory through Vite preview and repeats the complete journey against production output. Set `DEPLOYMENT_BASE_URL=https://<deployment>.vercel.app` when invoking `pnpm test:deployment` to run the same deterministic journey against a Vercel preview or production deployment without starting a local server. This still does not replace the native WebMCP acceptance journey in a clean ChatGPT browser session.

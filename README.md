@@ -61,6 +61,26 @@ pnpm test
 pnpm build
 ```
 
+### Public judge deployment
+
+The credential-free judge app deploys to Vercel as a Vite static site. `vercel.json` fixes the framework, frozen-lockfile install, build command and `dist` output contract in the repository. The connected GitHub project creates preview deployments for branch pushes and promotes reviewed `main` merges to the stable production URL without storing a Vercel token in this repository.
+
+Live judge demo: [conversion-lab-webmcp.vercel.app](https://conversion-lab-webmcp.vercel.app)
+
+Run the deployment contract locally with:
+
+```bash
+make test-deployment
+```
+
+Run the same deterministic journey against a deployed URL with:
+
+```bash
+DEPLOYMENT_BASE_URL=https://your-deployment.vercel.app pnpm test:deployment
+```
+
+After production deployment, repeat the native ChatGPT in-app-browser acceptance journey from a clean session. A successful local preview, Vercel build or scripted browser run is not, by itself, evidence that native WebMCP is available in the judge environment.
+
 ### Optional Shopify dev-store read
 
 The public demo continues to use the deterministic fixture and needs no credentials. To prove the same commerce contract against one real, single-variant Shopify dev-store product, copy `.env.example` to a local ignored environment file, add a server-side Admin API token with `read_products`, load those values into your shell, and run:
