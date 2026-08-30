@@ -142,6 +142,8 @@ Exit condition: feed and campaign payloads pass contract tests and appear in the
 
 Priority: must ship.
 
+Status: in progress. The stable Vercel app, public repository, MIT license, setup instructions, Devpost-ready draft, 165-second storyboard, and executable submission manifest are present. Native WebMCP acceptance, second-session rehearsal, public narrated video, fallback capture, and Devpost confirmation remain external checkpoints and are not inferred from CI.
+
 Deliverables:
 
 - Deploy a stable public URL usable in ChatGPT’s in-app browser.
@@ -311,9 +313,9 @@ Roadmap progress may be updated when evidence is executable. A material promise,
 
 | Decision | Current position | Evidence needed |
 | --- | --- | --- |
-| Hackathon hosting provider | Select for speed, stable HTTPS, and WebMCP browser compatibility | Deploy spike and clean-session test |
-| Live Shopify proof | Aim for a controlled dev-store product, but do not block credential-free judging | Dev store and least-privilege credential availability |
-| Live Ads proof | Stretch; PAUSED only | Eligible Ads account/API key and safe test objects |
+| Hackathon hosting provider | Vercel selected; stable public URL and production-output smoke are delivered | Native WebMCP and second-session public rehearsal |
+| Live Shopify proof | Optional read adapter and update preview delivered; live write remains stretch and must not block judging | Dev store and least-privilege credential availability |
+| Live Ads proof | Validated CSV and PAUSED projection delivered; live API remains stretch | Eligible Ads account/API key and safe test objects |
 | Initial standalone buyer | Shopify merchant vs commerce agency | Discovery interviews and onboarding friction |
 | Pricing unit | Deferred | Willingness-to-pay conversations and usage shape |
 | Platform integration timing | After standalone contracts and target approval refactor stabilize | Cross-repo schema review and refactor checkpoint |

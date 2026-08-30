@@ -1,4 +1,4 @@
-.PHONY: help install verify-diff check build test test-unit test-adversarial test-infrastructure test-coverage test-smoke test-deployment test-fast test-all test-affected shopify-read ci
+.PHONY: help install verify-diff check build test test-unit test-adversarial test-infrastructure test-submission test-coverage test-smoke test-deployment test-fast test-all test-affected shopify-read ci
 
 BASE_REF ?= origin/main
 
@@ -9,6 +9,7 @@ help:
 	@echo "  make test-unit          Unit and narrow contract tests"
 	@echo "  make test-adversarial   Authority, lifecycle and failure-boundary tests"
 	@echo "  make test-infrastructure Change-impact selector contract tests"
+	@echo "  make test-submission    Submission artifacts and honest external-checkpoint status"
 	@echo "  make test-fast          Typecheck plus unit tests"
 	@echo ""
 	@echo "System confidence:"
@@ -42,6 +43,9 @@ test-adversarial:
 test-infrastructure:
 	pnpm test:infrastructure
 
+test-submission:
+	pnpm test:submission
+
 test-coverage:
 	pnpm test:coverage
 
@@ -54,7 +58,7 @@ test-deployment:
 
 test-fast: verify-diff check test-unit test-infrastructure
 
-test-all: verify-diff check test-infrastructure test-coverage build test-smoke test-deployment
+test-all: verify-diff check test-infrastructure test-submission test-coverage build test-smoke test-deployment
 
 test-affected:
 	node scripts/test-affected.mjs --base "$(BASE_REF)"

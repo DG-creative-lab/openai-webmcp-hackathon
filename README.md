@@ -113,6 +113,18 @@ Product delivery is organized across hackathon, standalone beta, platform-integr
 5. Tell Codex to continue with the prompt shown by the guide. It publishes the approved demo copy, prepares the downloadable CSV and PAUSED paid projection, verifies the shopper match and updates the cart.
 6. Switch to **Shopper view** and verify the same approved copy and cart state.
 
+## Submission readiness
+
+The [submission pack](docs/SUBMISSION.md) contains Devpost-ready narrative, a judging-criteria map, honest integration boundaries, a 165-second video storyboard, capture list, and final external checklist. Its machine-readable status lives in [`docs/submission-manifest.json`](docs/submission-manifest.json).
+
+Validate the repository-owned submission contract with:
+
+```bash
+make test-submission
+```
+
+This command does not pretend to complete external work. Native ChatGPT WebMCP acceptance, a second clean-session rehearsal, the public narrated video, and final Devpost confirmation remain pending until their evidence is recorded in the manifest.
+
 The reset control is deliberately absent from the WebMCP site-tool surface. It remains available in the page UI, so ordinary browser automation could still operate it. Reset clears evaluation, approval, channel projections, cart state and prior activity while preserving verified product evidence and the browser's WebMCP registration.
 
 ## Product boundaries
