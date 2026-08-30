@@ -37,20 +37,67 @@ function isSafeHttpsUrl(value) {
   }
 }
 
-function hasAllowedHostname(value, allowedHostnames) {
-  if (!isSafeHttpsUrl(value)) return false;
-  const hostname = new URL(value).hostname.toLowerCase();
-  return allowedHostnames.some((allowed) => hostname === allowed || hostname.endsWith(`.${allowed}`));
+function safeUrl(value) {
+  if (!isSafeHttpsUrl(value)) return null;
+  return new URL(value);
+}
+
+function isYouTubeVideoUrl(value) {
+  const url = safeUrl(value);
+  if (!url) return false;
+  const hostname = url.hostname.toLowerCase();
+  const parts = url.pathname.split("/").filter(Boolean);
+  const videoId = hostname === "youtu.be" && parts.length === 1
+    ? parts[0]
+    : (hostname === "youtube.com" || hostname.endsWith(".youtube.com")) && url.pathname === "/watch"
+      ? url.searchParams.get("v")
+      : (hostname === "youtube.com" || hostname.endsWith(".youtube.com"))
+        && parts.length === 2
+        && ["shorts", "embed"].includes(parts[0])
+        ? parts[1]
+        : null;
+  return typeof videoId === "string" && /^[A-Za-z0-9_-]{11}$/.test(videoId);
+}
+
+function isGitHubEvidenceResourceUrl(value) {
+  const url = safeUrl(value);
+  if (!url || url.hostname.toLowerCase() !== "github.com") return false;
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts.length === 4 && parts[2] === "issues") {
+    return parts[0].length > 0 && parts[1].length > 0 && /^\d+$/.test(parts[3]);
+  }
+  if (parts.length === 5 && parts[2] === "actions" && parts[3] === "runs") {
+    return parts[0].length > 0 && parts[1].length > 0 && /^\d+$/.test(parts[4]);
+  }
+  return parts.length === 7
+    && parts[2] === "actions"
+    && parts[3] === "runs"
+    && /^\d+$/.test(parts[4])
+    && ["job", "artifacts"].includes(parts[5])
+    && /^\d+$/.test(parts[6]);
 }
 
 function isAuditableJourneyEvidenceUrl(value) {
-  return hasAllowedHostname(value, ["github.com", "youtube.com", "youtu.be"]);
+  return isGitHubEvidenceResourceUrl(value) || isYouTubeVideoUrl(value);
+}
+
+function isDevpostSubmissionUrl(value) {
+  const url = safeUrl(value);
+  if (!url || (url.hostname.toLowerCase() !== "devpost.com" && !url.hostname.toLowerCase().endsWith(".devpost.com"))) {
+    return false;
+  }
+  const parts = url.pathname.split("/").filter(Boolean);
+  return parts.length === 2 && parts[0] === "software" && /^[a-z0-9][a-z0-9-]*$/i.test(parts[1]);
 }
 
 function isIsoDate(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function isCompletionDate(value, todayUtc) {
+  return isIsoDate(value) && value <= todayUtc;
 }
 
 function validateExactKeys(errors, prefix, value, expectedKeys) {
@@ -112,17 +159,17 @@ function validateCapabilityFacts(manifest, errors) {
   }
 }
 
-function validateJourneyEvidence(key, evidence, manifest, errors, expected) {
+function validateJourneyEvidence(key, evidence, manifest, errors, expected, todayUtc) {
   const prefix = `manifest:externalAcceptance.${key}.evidence`;
   const value = validateExactKeys(errors, prefix, evidence, expected.keys);
   if (!value) return;
   if (value.kind !== expected.kind) errors.push(`${prefix}.kind`);
-  if (!isIsoDate(value.runDate)) errors.push(`${prefix}.runDate`);
+  if (!isCompletionDate(value.runDate, todayUtc)) errors.push(`${prefix}.runDate`);
   if (value.appUrl !== manifest.liveUrl) errors.push(`${prefix}.appUrl`);
   expected.validate(value, prefix, errors);
 }
 
-function validateAcceptanceEvidence(key, evidence, manifest, errors) {
+function validateAcceptanceEvidence(key, evidence, manifest, errors, todayUtc) {
   if (key === "scriptedPublicJourney") {
     validateJourneyEvidence(key, evidence, manifest, errors, {
       kind: "scripted_public_journey",
@@ -133,7 +180,7 @@ function validateAcceptanceEvidence(key, evidence, manifest, errors) {
         if (!Number.isInteger(value.totalTests) || value.totalTests < 1) target.push(`${prefix}.totalTests`);
         if (!Number.isInteger(value.passedTests) || value.passedTests !== value.totalTests) target.push(`${prefix}.passedTests`);
       },
-    });
+    }, todayUtc);
     return;
   }
   if (key === "nativeChatgptWebmcpJourney") {
@@ -147,7 +194,7 @@ function validateAcceptanceEvidence(key, evidence, manifest, errors) {
         if (value.journeyCompleted !== true) target.push(`${prefix}.journeyCompleted`);
         if (!isAuditableJourneyEvidenceUrl(value.evidenceUrl)) target.push(`${prefix}.evidenceUrl`);
       },
-    });
+    }, todayUtc);
     return;
   }
   if (key === "secondCleanSession") {
@@ -160,7 +207,7 @@ function validateAcceptanceEvidence(key, evidence, manifest, errors) {
         if (value.journeyCompleted !== true) target.push(`${prefix}.journeyCompleted`);
         if (!isAuditableJourneyEvidenceUrl(value.evidenceUrl)) target.push(`${prefix}.evidenceUrl`);
       },
-    });
+    }, todayUtc);
     return;
   }
   if (key === "publicVideo") {
@@ -168,9 +215,9 @@ function validateAcceptanceEvidence(key, evidence, manifest, errors) {
     const value = validateExactKeys(errors, prefix, evidence, ["kind", "publishedAt", "provider", "url", "durationSeconds", "hasAudio"]);
     if (!value) return;
     if (value.kind !== "public_demo_video") errors.push(`${prefix}.kind`);
-    if (!isIsoDate(value.publishedAt)) errors.push(`${prefix}.publishedAt`);
+    if (!isCompletionDate(value.publishedAt, todayUtc)) errors.push(`${prefix}.publishedAt`);
     if (value.provider !== "youtube") errors.push(`${prefix}.provider`);
-    if (!hasAllowedHostname(value.url, ["youtube.com", "youtu.be"])) errors.push(`${prefix}.url`);
+    if (!isYouTubeVideoUrl(value.url)) errors.push(`${prefix}.url`);
     if (value.url !== manifest.video?.publicUrl) errors.push(`${prefix}.urlMismatch`);
     if (!Number.isInteger(value.durationSeconds) || value.durationSeconds < 1 || value.durationSeconds > manifest.video?.maximumSeconds) {
       errors.push(`${prefix}.durationSeconds`);
@@ -183,16 +230,18 @@ function validateAcceptanceEvidence(key, evidence, manifest, errors) {
     const value = validateExactKeys(errors, prefix, evidence, ["kind", "submittedAt", "submissionUrl", "confirmationId"]);
     if (!value) return;
     if (value.kind !== "devpost_submission_receipt") errors.push(`${prefix}.kind`);
-    if (!isIsoDate(value.submittedAt)) errors.push(`${prefix}.submittedAt`);
-    if (!hasAllowedHostname(value.submissionUrl, ["devpost.com"])) errors.push(`${prefix}.submissionUrl`);
+    if (!isCompletionDate(value.submittedAt, todayUtc)) errors.push(`${prefix}.submittedAt`);
+    if (!isDevpostSubmissionUrl(value.submissionUrl)) errors.push(`${prefix}.submissionUrl`);
     if (typeof value.confirmationId !== "string" || value.confirmationId.trim().length < 6) errors.push(`${prefix}.confirmationId`);
   }
 }
 
-export function validateSubmissionManifest(value) {
+export function validateSubmissionManifest(value, { now = new Date() } = {}) {
   const errors = [];
   const manifest = record(value);
   if (!manifest) return ["manifest:root"];
+  if (!(now instanceof Date) || Number.isNaN(now.getTime())) return ["validator:now"];
+  const todayUtc = now.toISOString().slice(0, 10);
 
   if (manifest.schemaVersion !== "conversion-lab.submission.v1") errors.push("manifest:schemaVersion");
   if (manifest.productName !== "Conversion Lab") errors.push("manifest:productName");
@@ -233,7 +282,7 @@ export function validateSubmissionManifest(value) {
         continue;
       }
       if (item.status === "pending" && item.evidence !== null) errors.push(`manifest:externalAcceptance.${key}.pendingEvidence`);
-      if (item.status === "passed") validateAcceptanceEvidence(key, item.evidence, manifest, errors);
+      if (item.status === "passed") validateAcceptanceEvidence(key, item.evidence, manifest, errors, todayUtc);
     }
   }
 
