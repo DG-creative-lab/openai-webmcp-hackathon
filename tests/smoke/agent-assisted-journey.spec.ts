@@ -34,7 +34,7 @@ test.beforeEach(async ({ page }) => {
 
 test("an agent discovers the tools and completes the journey around the visible approval checkpoint", async ({ page }) => {
   await page.goto("./");
-  await expect(page.getByText("9 site tools · 3 read / 6 state")).toBeVisible();
+  await expect(page.getByText("10 site tools · 4 read / 6 state")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Start with one agent prompt" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Modular Commuter Pack" })).toBeVisible();
   const productImage = page.getByAltText("Black waterproof commuter pack mounted on a bicycle rack in the rain");
@@ -54,10 +54,11 @@ test("an agent discovers the tools and completes the journey around the visible 
     "stage_variant_for_review",
     "publish_approved_variant",
     "prepare_openai_ads_package",
+    "get_optimization_receipt",
     "search_product_by_need",
     "update_demo_cart",
   ]));
-  expect(toolNames).toHaveLength(9);
+  expect(toolNames).toHaveLength(10);
   expect(toolNames.some((name) => name.startsWith("approve_") || name.startsWith("reset_"))).toBe(false);
 
   const workspace = await executeTool(page, "get_growth_workspace") as {
@@ -115,6 +116,23 @@ test("an agent discovers the tools and completes the journey around the visible 
   expect(ads.adsPackage.validation.unverified.length).toBeGreaterThan(0);
   expect(ads.effect).toMatchObject({ class: "paid_projection", externalWrite: false });
   await expect(page.getByText("CSV ready · Schema valid locally · Campaign PAUSED")).toBeVisible();
+  const receipt = await executeTool(page, "get_optimization_receipt") as {
+    receipt: {
+      contractVersion: string;
+      receiptDigest: string;
+      assurance: { cryptographicallySigned: boolean };
+      evaluation: { baseline: { score: number }; optimized: { score: number } };
+      externalEffects: { shopifyWrite: boolean; adsActivation: boolean; adsSpendMinor: number };
+    };
+  };
+  expect(receipt.receipt).toMatchObject({
+    contractVersion: "conversion-lab.optimization-receipt.v1",
+    receiptDigest: expect.stringMatching(/^sha256-v1-[a-f0-9]{64}$/),
+    assurance: { cryptographicallySigned: false },
+    evaluation: { baseline: { score: 0 }, optimized: { score: 8 } },
+    externalEffects: { shopifyWrite: false, adsActivation: false, adsSpendMinor: 0 },
+  });
+  await expect(page.getByText("Content-addressed JSON ready")).toBeVisible();
   const downloadEvent = page.waitForEvent("download");
   await page.getByRole("button", { name: /Download Ads feed CSV/ }).click();
   const download = await downloadEvent;
@@ -124,6 +142,19 @@ test("an agent discovers the tools and completes the journey around the visible 
   const feedContents = await readFile(downloadPath!, "utf8");
   expect(feedContents).toContain("id,title,description,link,image_link");
   expect(feedContents).toContain('"URB-24-BLK","24L Waterproof Commuter Backpack + Pannier"');
+
+  const receiptDownloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: /Download receipt JSON/ }).click();
+  const receiptDownload = await receiptDownloadEvent;
+  expect(receiptDownload.suggestedFilename()).toBe("conversion-lab-optimization-receipt.json");
+  const receiptPath = await receiptDownload.path();
+  expect(receiptPath).not.toBeNull();
+  const receiptContents = JSON.parse(await readFile(receiptPath!, "utf8"));
+  expect(receiptContents).toMatchObject({
+    contractVersion: "conversion-lab.optimization-receipt.v1",
+    receiptDigest: receipt.receipt.receiptDigest,
+    assurance: { cryptographicallySigned: false },
+  });
 
   const recommendation = await executeTool(page, "search_product_by_need", {
     query: "I need a waterproof bag for a 16-inch laptop",
@@ -144,5 +175,5 @@ test("an agent discovers the tools and completes the journey around the visible 
   await page.getByRole("button", { name: /Shopper view 2/ }).click();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await expect(page.getByRole("heading", { name: "24L Waterproof Commuter Backpack + Pannier" })).toBeVisible();
-  await expect(page.getByText("This page exposes verified fit, weather, repair, price and delivery facts through 9 WebMCP site tools.")).toBeVisible();
+  await expect(page.getByText("This page exposes verified fit, weather, repair, price and delivery facts through 10 WebMCP site tools.")).toBeVisible();
 });

@@ -30,7 +30,7 @@ function validManifest() {
     liveUrl: "https://conversion-lab-webmcp.vercel.app/",
     repositoryUrl: "https://github.com/DG-creative-lab/openai-webmcp-hackathon",
     license: "MIT",
-    siteToolCount: 9,
+    siteToolCount: 10,
     video: { maximumSeconds: 180, plannedSeconds: 165, publicUrl: null },
     capabilities,
     claims: submissionClaimsFromCapabilities(capabilities),

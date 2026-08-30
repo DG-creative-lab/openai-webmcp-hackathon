@@ -17,15 +17,17 @@ Conversion Lab makes that gap measurable. It:
 5. Binds the demo approval state with a versioned SHA-256 digest over the canonical product target, feed-bearing commercial snapshot, exact copy, complete evidence content, tags and provenance.
 6. Publishes only that digest-approved version to the demo storefront.
 7. Produces a digest-bound, locally schema-validated OpenAI Ads CSV feed export and **PAUSED** campaign projection.
+8. Packages the approved target, evidence provenance, 0/8 → 8/8 evaluation and both channel projections into an unsigned, content-addressed optimisation receipt for local JSON download.
 
 ## WebMCP site tools
 
-The app registers nine page-scoped tools with `document.modelContext.registerTool`:
+The app registers ten page-scoped tools with `document.modelContext.registerTool`:
 
 | Tool | Effect |
 | --- | --- |
 | `get_growth_workspace` | Reads product, evidence, evaluation and channel state |
 | `audit_channel_readiness` | Explains organic and paid readiness gaps |
+| `get_optimization_receipt` | Reads the completed portable receipt without changing state |
 | `create_evidence_led_variant` | Creates a draft from verified evidence |
 | `run_buyer_intent_battery` | Runs and stores eight deterministic evaluations |
 | `stage_variant_for_review` | Stages a tested variant; cannot approve it through site tools |
@@ -43,7 +45,10 @@ Every input schema is narrow and rejects additional properties. Read-only tools 
 - This credential-free demo does not authenticate the browser actor and therefore does not claim enforced human or merchant-only authority. A production Shopify write requires an authenticated merchant grant bound to the same target and digest.
 - Publishing fails if approval is missing or stale.
 - The Ads integration is deliberately a projection: no credential, SFTP upload, external API write, activation or spend path exists in this demo.
+- The portable receipt is a deeply frozen `conversion-lab.optimization-receipt.v1` JSON artifact with a `sha256-v1` digest over recursively key-sorted canonical JSON, so property order does not change verification. It is deliberately unsigned: the public browser has no protected signing authority, and the receipt makes that limitation explicit.
 - Cart tools cannot initiate checkout or payment.
+
+The portable field contract and cross-system verification steps are documented in [`docs/OPTIMIZATION-RECEIPT.md`](docs/OPTIMIZATION-RECEIPT.md).
 
 ## Run locally
 

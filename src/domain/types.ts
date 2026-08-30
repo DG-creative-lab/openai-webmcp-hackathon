@@ -1,4 +1,5 @@
 import type { ApprovalEnvelope, CommerceContractVersion, CommerceIdentity, EffectReceipt, EvidenceRecord, SourceProvenance } from "../commerce/contracts";
+import type { OptimizationReceipt } from "../commerce/optimizationReceipt";
 import type { ShopifyOperationPreview } from "../commerce/shopifyAdminPreview";
 
 export type Surface = "studio" | "storefront";
@@ -153,6 +154,7 @@ export interface AppState {
   variantEvaluation: Evaluation | null;
   commerce: CommerceIntegrationState;
   adsPackage: AdsPackage;
+  optimizationReceipt: OptimizationReceipt | null;
   cartQuantity: number;
   webmcpAvailable: boolean;
   activities: Activity[];

@@ -118,6 +118,9 @@ function snapshot() {
         : null,
     },
     ads: { status: state.adsPackage.status, campaignStatus: state.adsPackage.campaignStatus, validation: state.adsPackage.validation },
+    optimizationReceipt: state.optimizationReceipt
+      ? { contractVersion: state.optimizationReceipt.contractVersion, receiptDigest: state.optimizationReceipt.receiptDigest }
+      : null,
     cartQuantity: state.cartQuantity,
   };
 }
@@ -221,6 +224,20 @@ export async function registerWebMCPTools(): Promise<boolean> {
           safety: "Paid activation, spend, checkout and payment are outside this demo's authority.",
         }, state.variant.status === "baseline" ? "Create an evidence-led draft." : "Continue the lifecycle shown in workspace.variant.status.");
       }),
+    },
+    {
+      name: "get_optimization_receipt",
+      description: "Read the portable, content-addressed optimisation receipt after approved publication and paid projection. Returns complete evidence, evaluations and channel proofs; never writes or signs anything.",
+      inputSchema: emptySchema,
+      annotations: readOnlyAnnotations,
+      execute: noInput(async () => success(effects.read, {
+        receipt: appStore.getOptimizationReceipt(),
+        artifact: {
+          filename: "conversion-lab-optimization-receipt.json",
+          mediaType: "application/json",
+          localDownloadOnly: true,
+        },
+      }, "Inspect or download the JSON receipt. It is content-addressed but deliberately unsigned, and records no external commerce effect.")),
     },
     {
       name: "create_evidence_led_variant",
