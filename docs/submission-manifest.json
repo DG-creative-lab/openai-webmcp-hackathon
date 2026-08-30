@@ -11,6 +11,18 @@
     "plannedSeconds": 165,
     "publicUrl": null
   },
+  "capabilities": {
+    "webmcpApprovalTool": false,
+    "webmcpResetTool": false,
+    "liveShopifyWrite": false,
+    "adsSftpUpload": false,
+    "adsApiWrite": false,
+    "adsActivation": false,
+    "adsSpend": false,
+    "authenticatedMerchantAuthority": false,
+    "checkoutStarted": false,
+    "paymentAttempted": false
+  },
   "claims": {
     "webmcp": "Nine page-scoped tools share the visible browser workspace; approval and reset are absent from the site-tool surface.",
     "shopify": "The public demo uses a deterministic fixture, with an optional server-side Shopify read adapter and a blocked productUpdate preview; it performs no live Shopify write.",
@@ -20,7 +32,15 @@
   "externalAcceptance": {
     "scriptedPublicJourney": {
       "status": "passed",
-      "evidence": "2026-08-29: Playwright Chromium completed 1/1 against https://conversion-lab-webmcp.vercel.app/ using a standards-shaped injected document.modelContext host; this is not native ChatGPT WebMCP acceptance."
+      "evidence": {
+        "kind": "scripted_public_journey",
+        "runDate": "2026-08-29",
+        "appUrl": "https://conversion-lab-webmcp.vercel.app/",
+        "runner": "playwright",
+        "modelContextMode": "injected_test_host",
+        "passedTests": 1,
+        "totalTests": 1
+      }
     },
     "nativeChatgptWebmcpJourney": {
       "status": "pending",

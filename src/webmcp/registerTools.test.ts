@@ -199,6 +199,52 @@ describe("WebMCP registration", () => {
     expect(definitions).toHaveLength(9);
   });
 
+  it("stops at the first rejected tool and permanently disables that host without duplicates", async () => {
+    const attemptedNames: string[] = [];
+    const registeredNames: string[] = [];
+    const host = {
+      registerTool: async (definition: ToolDefinition) => {
+        attemptedNames.push(definition.name);
+        if (definition.name === "run_buyer_intent_battery") {
+          throw new Error("host rejected tool");
+        }
+        registeredNames.push(definition.name);
+      },
+    };
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: { modelContext: host },
+    });
+
+    await expect(registerWebMCPTools()).rejects.toThrow(/permanently disabled/i);
+    expect(attemptedNames).toEqual([
+      "get_growth_workspace",
+      "audit_channel_readiness",
+      "create_evidence_led_variant",
+      "run_buyer_intent_battery",
+    ]);
+    expect(registeredNames).toEqual([
+      "get_growth_workspace",
+      "audit_channel_readiness",
+      "create_evidence_led_variant",
+    ]);
+    expect(registeredNames).not.toContain("publish_approved_variant");
+    expect(registeredNames).not.toContain("prepare_openai_ads_package");
+    expect(registeredNames).not.toContain("update_demo_cart");
+    expect(appStore.getState().webmcpAvailable).toBe(false);
+
+    await expect(registerWebMCPTools()).resolves.toBe(false);
+    let waits = 0;
+    await expect(registerWebMCPToolsWithRetry({
+      maxAttempts: 3,
+      delayMs: 0,
+      wait: async () => { waits += 1; },
+    })).resolves.toBe(false);
+    expect(waits).toBe(0);
+    expect(attemptedNames).toHaveLength(4);
+    expect(registeredNames).toHaveLength(3);
+  });
+
   it("rejects invalid retry configuration without attempting registration", async () => {
     Object.defineProperty(globalThis, "document", { configurable: true, value: {} });
 

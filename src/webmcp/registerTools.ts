@@ -18,8 +18,14 @@ const stateChangeAnnotations = {
   openWorldHint: false,
 };
 
-const registeredHosts = new WeakSet<object>();
-const registrationAttempts = new WeakMap<object, Promise<boolean>>();
+interface HostRegistrationState {
+  status: "registering" | "registered" | "failed";
+  confirmedToolNames: Set<string>;
+  attempt?: Promise<boolean>;
+  failedToolName?: string;
+}
+
+const hostRegistrations = new WeakMap<object, HostRegistrationState>();
 
 export interface WebMCPRegistrationRetryOptions {
   maxAttempts?: number;
@@ -174,13 +180,16 @@ export async function registerWebMCPTools(): Promise<boolean> {
   }
   const registerTool = host.registerTool.bind(host);
 
-  if (registeredHosts.has(host)) {
+  const existing = hostRegistrations.get(host);
+  if (existing?.status === "registered") {
     appStore.setWebmcpAvailable(true);
     return true;
   }
-
-  const pendingAttempt = registrationAttempts.get(host);
-  if (pendingAttempt) return pendingAttempt;
+  if (existing?.status === "failed") {
+    appStore.setWebmcpAvailable(false);
+    return false;
+  }
+  if (existing?.status === "registering" && existing.attempt) return existing.attempt;
 
   const tools = [
     {
@@ -314,17 +323,33 @@ export async function registerWebMCPTools(): Promise<boolean> {
     },
   ];
 
-  const attempt = Promise.all(tools.map((tool) => registerTool(tool)))
-    .then(() => {
-      registeredHosts.add(host);
-      appStore.setWebmcpAvailable(true);
-      return true;
-    })
-    .finally(() => {
-      registrationAttempts.delete(host);
-    });
+  const state: HostRegistrationState = {
+    status: "registering",
+    confirmedToolNames: new Set(),
+  };
+  const attempt = (async () => {
+    for (const tool of tools) {
+      try {
+        await registerTool(tool);
+        state.confirmedToolNames.add(tool.name);
+      } catch (cause) {
+        state.status = "failed";
+        state.failedToolName = tool.name;
+        appStore.setWebmcpAvailable(false);
+        throw new Error(
+          `WebMCP registration failed at ${tool.name}; this browser host is permanently disabled until a fresh page host is provided.`,
+          { cause },
+        );
+      }
+    }
 
-  registrationAttempts.set(host, attempt);
+    state.status = "registered";
+    appStore.setWebmcpAvailable(true);
+    return true;
+  })();
+
+  state.attempt = attempt;
+  hostRegistrations.set(host, state);
   return attempt;
 }
 
@@ -342,6 +367,8 @@ export async function registerWebMCPToolsWithRetry({
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     if (await registerWebMCPTools()) return true;
+    const host = document.modelContext;
+    if (host && hostRegistrations.get(host)?.status === "failed") return false;
     if (attempt < maxAttempts) await wait(delayMs);
   }
 
