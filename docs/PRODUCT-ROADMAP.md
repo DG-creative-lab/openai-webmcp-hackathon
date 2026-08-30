@@ -58,13 +58,14 @@ The MVP must demonstrate a coherent product experience, not a collection of inte
 ### Already delivered
 
 - One evidence-led Shopify-style product workspace and shopper view.
-- Nine page-scoped WebMCP tools sharing visible browser state.
+- Ten page-scoped WebMCP tools sharing visible browser state.
 - Deterministic 0/8 → 8/8 buyer-intent evaluation.
 - Exact digest-bound visible demo approval state before publication, explicitly labeled as unauthenticated.
 - Digest-bound, locally schema-validated Google-compatible OpenAI Ads CSV export and PAUSED campaign projection with external acceptance limits disclosed.
 - Versioned commerce contracts, Shopify Admin 2026-07 update preview, and optional credential-contained dev-store product read.
 - Stable public Vercel deployment with Git previews and repeatable production-output smoke coverage.
 - Approval and reset absent from the WebMCP site-tool surface, plus a visible activity trail.
+- Versioned, unsigned and content-addressed portable optimisation receipt spanning evidence, 0/8 → 8/8 evaluation, Shopify preview and PAUSED Ads projection.
 - Unit, contract, adversarial, change-impact, coverage, build, and browser smoke gates.
 - Branch-based pull-request workflow with a complete merge gate.
 

@@ -1,6 +1,7 @@
 import { createFieldworkFixtureSnapshot } from "../commerce/fieldworkFixture";
 import { assertApprovalBinding, assertEvidenceAuthority, digestApprovalPayload } from "../commerce/approvalBinding";
 import { prepareOpenAIAdsFeedProjection } from "../commerce/openaiAdsFeedProjection";
+import { createOptimizationReceipt } from "../commerce/optimizationReceipt";
 import { previewShopifyProductRead, previewShopifyProductUpdate } from "../commerce/shopifyAdminPreview";
 import { COMMERCE_CONTRACT_VERSION, type ApprovalEnvelope, type ApprovalProductSnapshot, type EvidenceRecord, type RepresentationVariant } from "../commerce/contracts";
 import { evaluateCopy } from "../domain/evaluation";
@@ -110,6 +111,7 @@ function initialState(webmcpAvailable: boolean, resetByBrowserUser = false): App
     variantEvaluation: null,
     commerce: initialCommerce(),
     adsPackage: initialAdsPackage(),
+    optimizationReceipt: null,
     cartQuantity: 0,
     webmcpAvailable,
     activities: [
@@ -203,6 +205,7 @@ export const appStore = {
       variantEvaluation: null,
       commerce: { ...current.commerce, updatePreview: null },
       adsPackage: initialAdsPackage(),
+      optimizationReceipt: null,
       activities: addActivity(current, actor, "Variant generated", "Rewrote the product around eight verified buyer-relevant facts."),
     })).variant;
   },
@@ -306,20 +309,43 @@ export const appStore = {
       representation: representationFor(candidate, currentDigest),
       evidence: approvedEvidence,
     });
+    const nextAdsPackage: AppState["adsPackage"] = {
+      ...candidate.adsPackage,
+      status: "ready",
+      campaignStatus: "PAUSED",
+      feed,
+      feedExport,
+      validation,
+      adTemplate: { headline: candidate.variant.title, description: candidate.variant.description },
+    };
+    if (!candidate.variantEvaluation || !candidate.variant.publishedAt || !candidate.commerce.updatePreview) {
+      throw new Error("Optimisation receipt blocked: evaluation, publication time, and Shopify preview must be present.");
+    }
+    const optimizationReceipt = await createOptimizationReceipt({
+      approval: candidate.variant.approval,
+      representation: representationFor(candidate, currentDigest),
+      evidence: approvedEvidence,
+      baselineCopy: candidate.product.baseline,
+      baselineEvaluation: candidate.baselineEvaluation,
+      optimizedEvaluation: candidate.variantEvaluation,
+      shopifyPreview: candidate.commerce.updatePreview,
+      adsPackage: nextAdsPackage,
+      publishedAt: candidate.variant.publishedAt,
+      issuedAt: candidate.optimizationReceipt?.issuedAt ?? new Date().toISOString(),
+    });
     assertWorkspaceUnchanged(candidate, "Ads preparation");
     return update((current) => ({
       ...current,
-      adsPackage: {
-        ...current.adsPackage,
-        status: "ready",
-        campaignStatus: "PAUSED",
-        feed,
-        feedExport,
-        validation,
-        adTemplate: { headline: candidate.variant.title, description: candidate.variant.description },
-      },
-      activities: addActivity(current, actor, "Ads package prepared", "Created a digest-bound Google-compatible CSV export, locally schema-valid feed row and PAUSED campaign projection. Ads Manager feed connection, SFTP upload and OpenAI acceptance remain external; £0 spend."),
+      adsPackage: nextAdsPackage,
+      optimizationReceipt,
+      activities: addActivity(current, actor, "Ads package and receipt prepared", "Created a digest-bound CSV, PAUSED paid projection and unsigned portable optimisation receipt. No Shopify write, Ads upload, activation or spend occurred."),
     })).adsPackage;
+  },
+  getOptimizationReceipt() {
+    if (!state.optimizationReceipt) {
+      throw new Error("Optimisation receipt unavailable: publish the approved variant and prepare the OpenAI Ads package first.");
+    }
+    return state.optimizationReceipt;
   },
   updateCart(quantity: number, actor: Activity["actor"] = "Agent") {
     const normalizedQuantity = Number.isFinite(quantity) ? Math.floor(quantity) : 0;

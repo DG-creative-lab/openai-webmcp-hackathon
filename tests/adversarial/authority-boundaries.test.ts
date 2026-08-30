@@ -98,6 +98,7 @@ describe("adversarial authority and lifecycle boundaries", () => {
       feed: null,
       feedExport: null,
     });
+    expect(appStore.getState().optimizationReceipt).toBeNull();
   });
 
   it("does not expose mutable authoritative state to a caller", () => {
@@ -140,6 +141,20 @@ describe("adversarial authority and lifecycle boundaries", () => {
     expect(appStore.getState().adsPackage.feedExport?.contents).not.toBe("hostile replacement");
   });
 
+  it("keeps the portable receipt deeply immutable and invalidates tampered copies", async () => {
+    await reach("published");
+    await appStore.prepareAds("Agent");
+    const receipt = appStore.getOptimizationReceipt();
+
+    expect(Object.isFrozen(receipt)).toBe(true);
+    expect(Object.isFrozen(receipt.evidenceSet.records)).toBe(true);
+    expect(Object.isFrozen(receipt.externalEffects)).toBe(true);
+    expect(() => {
+      (receipt.productSnapshot as { price: number }).price = 1;
+    }).toThrow(TypeError);
+    expect(appStore.getOptimizationReceipt().productSnapshot.price).toBe(159);
+  });
+
   it("fails closed when workspace state changes during asynchronous digest verification", async () => {
     await reach("staged");
     const pendingApproval = appStore.recordVisibleApproval();
@@ -175,13 +190,14 @@ describe("adversarial authority and lifecycle boundaries", () => {
     const tools = await registeredTools();
     const names = tools.map((tool) => tool.name);
 
-    expect(names).toHaveLength(9);
+    expect(names).toHaveLength(10);
     expect(names).not.toContain("approve_variant");
     expect(names.some((name) => name.startsWith("approve_") || name.startsWith("reset_"))).toBe(false);
     expect(tools.find((tool) => tool.name === "publish_approved_variant")?.description).toMatch(/does not authenticate|not authenticated/i);
     expect(tools.find((tool) => tool.name === "get_growth_workspace")?.annotations?.readOnlyHint).toBe(true);
     expect(tools.find((tool) => tool.name === "audit_channel_readiness")?.annotations?.readOnlyHint).toBe(true);
     expect(tools.find((tool) => tool.name === "search_product_by_need")?.annotations?.readOnlyHint).toBe(true);
+    expect(tools.find((tool) => tool.name === "get_optimization_receipt")?.annotations?.readOnlyHint).toBe(true);
   });
 
   it("returns an explicit no-match instead of inventing support", async () => {

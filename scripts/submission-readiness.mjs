@@ -117,7 +117,7 @@ export function submissionClaimsFromCapabilities(value) {
   const capabilities = record(value) ?? {};
   return {
     webmcp: capabilities.webmcpApprovalTool === false && capabilities.webmcpResetTool === false
-      ? "Nine page-scoped tools share the visible browser workspace; approval and reset are absent from the site-tool surface."
+      ? "Ten page-scoped tools share the visible browser workspace; approval and reset are absent from the site-tool surface."
       : "The WebMCP surface may expose approval or reset authority.",
     shopify: capabilities.liveShopifyWrite === false
       ? "The public demo uses a deterministic fixture, with an optional server-side Shopify read adapter and a blocked productUpdate preview; it performs no live Shopify write."
@@ -249,7 +249,7 @@ export function validateSubmissionManifest(value, { now = new Date() } = {}) {
   if (!isSafeHttpsUrl(manifest.liveUrl)) errors.push("manifest:liveUrl");
   if (!isSafeHttpsUrl(manifest.repositoryUrl)) errors.push("manifest:repositoryUrl");
   if (manifest.license !== "MIT") errors.push("manifest:license");
-  if (manifest.siteToolCount !== 9) errors.push("manifest:siteToolCount");
+  if (manifest.siteToolCount !== 10) errors.push("manifest:siteToolCount");
 
   const video = record(manifest.video);
   if (!video) {

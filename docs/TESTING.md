@@ -11,7 +11,7 @@ The quality system is deliberately layered. Agents may help discover failure cas
 | Infrastructure | `make test-infrastructure` | Change-impact mapping and conservative fallback behavior | Seconds |
 | Submission contract | `make test-submission` | Required public links, license, claims, video duration and honest external-checkpoint status | Seconds |
 | Coverage gate | `make test-coverage` | Unit and adversarial behavior across domain, store, and WebMCP control modules | Seconds |
-| Browser smoke | `make test-smoke` | Real page boot, tool discovery, shared session state, visible approval checkpoint, publication, digest-bound Ads CSV download, shopper recommendation and cart | Under a minute |
+| Browser smoke | `make test-smoke` | Real page boot, tool discovery, shared session state, visible approval checkpoint, publication, digest-bound Ads CSV and optimisation-receipt downloads, shopper recommendation and cart | Under a minute |
 | Deployment smoke | `make test-deployment` | Production Vite output, static assets, and the complete Vercel-shaped browser journey | Under a minute |
 | Complete merge gate | `make test-all` | Diff hygiene, typecheck, submission contract, coverage thresholds, production build and browser journey | Under a few minutes |
 
@@ -47,7 +47,7 @@ This gives granular feedback during development while retaining a macro-level pr
 
 The `$webmcp-quality-harness` skill in `.agents/skills` gives future Codex sessions the product invariants, selection rules and evidence-reporting standard. It may design or diagnose tests; it cannot approve variants, authorize external effects, lower a gate, or replace deterministic CI.
 
-The browser smoke test supplies a standards-shaped `document.modelContext` host before the app loads. It verifies that the nine tools are discoverable and executable in one shared page session. Its scripted click at the approval checkpoint is synthetic test setup, not evidence of human identity or authorization. The actual Codex in-app-browser journey remains a separate acceptance check for the browser's native WebMCP implementation.
+The browser smoke test supplies a standards-shaped `document.modelContext` host before the app loads. It verifies that the ten tools are discoverable and executable in one shared page session, including the read-only portable receipt after both channel projections complete. Its scripted click at the approval checkpoint is synthetic test setup, not evidence of human identity or authorization. The actual Codex in-app-browser journey remains a separate acceptance check for the browser's native WebMCP implementation.
 
 Production startup retries host discovery ten times over approximately 4.5 seconds so a browser that injects `document.modelContext` just after page boot can still receive the tool surface. Registration is sequential and idempotent per browser host, including concurrent attempts. If any registration rejects, the app records WebMCP as unavailable, stops before later tools, and permanently disables that host object because the browser API provides no transactional registration or unregister recovery; a fresh page host is required. Unit tests cover late availability, bounded fallback, partial rejection, invalid retry configuration, and duplicate prevention.
 

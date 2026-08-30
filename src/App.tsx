@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { appStore } from "./store/appStore";
+import { OPTIMIZATION_RECEIPT_FILENAME, serializeOptimizationReceipt } from "./commerce/optimizationReceipt";
 import type { Activity, AppState, IntentResult } from "./domain/types";
 import "./styles.css";
 
@@ -79,7 +80,7 @@ function AppHeader() {
       <div className="header-actions">
         <div className="connection-state">
           <StatusDot tone={state.webmcpAvailable ? "good" : "neutral"} />
-          <span>{state.webmcpAvailable ? "9 site tools · 3 read / 6 state" : "WebMCP-ready"}</span>
+          <span>{state.webmcpAvailable ? "10 site tools · 4 read / 6 state" : "WebMCP-ready"}</span>
         </div>
         <button
           type="button"
@@ -182,6 +183,20 @@ function Studio() {
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = artifact.filename;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
+  const downloadOptimizationReceipt = async () => {
+    const receipt = appStore.getState().optimizationReceipt;
+    if (!receipt) return;
+    const contents = await serializeOptimizationReceipt(receipt);
+    const url = URL.createObjectURL(new Blob([contents], { type: "application/json" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = OPTIMIZATION_RECEIPT_FILENAME;
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
@@ -293,6 +308,25 @@ function Studio() {
             )}
           </article>
         </div>
+        <aside className={`receipt-panel ${state.optimizationReceipt ? "is-ready" : ""}`} aria-label="Portable optimisation receipt">
+          <div>
+            <span className="channel-index">03 / PORTABLE PROOF</span>
+            <h3>Optimisation receipt</h3>
+            <p>{state.optimizationReceipt
+              ? "The exact approved product truth, evidence provenance, 0/8 → 8/8 result, Shopify preview and PAUSED Ads projection are packaged for another system to inspect."
+              : "Complete the approved Shopify preview and PAUSED Ads projection to produce one portable, machine-readable record."}</p>
+          </div>
+          <div className="receipt-panel__status">
+            <span><StatusDot tone={state.optimizationReceipt ? "good" : "warning"} />{state.optimizationReceipt ? "Content-addressed JSON ready" : "Awaiting complete channel proof"}</span>
+            {state.optimizationReceipt && <code>{state.optimizationReceipt.receiptDigest.slice(0, 24)}…</code>}
+            {state.optimizationReceipt && (
+              <button type="button" onClick={() => void downloadOptimizationReceipt()}>
+                Download receipt JSON ↘
+              </button>
+            )}
+            <small>Unsigned demo artifact · local download only · no external write</small>
+          </div>
+        </aside>
       </section>
     </main>
   );
@@ -316,7 +350,7 @@ function Storefront() {
           <button className="add-button" onClick={() => appStore.updateCart(state.cartQuantity + 1, "Browser user")}><span>Add to bag</span><span>{state.cartQuantity ? `${state.cartQuantity} in bag` : "£159"}</span></button>
           <div className="agent-proof">
             <div><span>Agent-readable product proof</span><strong>{published ? "08 / 08" : `${state.baselineEvaluation.score.toString().padStart(2, "0")} / 08`}</strong></div>
-            <p>{published ? "This page exposes verified fit, weather, repair, price and delivery facts through 9 WebMCP site tools." : "The approved evidence-led variant has not been published yet. Agents still see the current generic copy."}</p>
+            <p>{published ? "This page exposes verified fit, weather, repair, price and delivery facts through 10 WebMCP site tools." : "The approved evidence-led variant has not been published yet. Agents still see the current generic copy."}</p>
             <button onClick={() => appStore.setSurface("studio")}>Inspect in growth studio →</button>
           </div>
         </div>

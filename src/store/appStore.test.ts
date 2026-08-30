@@ -86,6 +86,52 @@ describe("demo lifecycle boundary", () => {
     expect(packageResult.feedExport?.contents).toContain("id,title,description,link,image_link");
     expect(packageResult.validation).toMatchObject({ scope: "local_schema", valid: true, errors: [] });
     expect(packageResult.validation?.unverified).toContain("The row is accepted during OpenAI feed processing");
+    expect(appStore.getOptimizationReceipt()).toMatchObject({
+      contractVersion: "conversion-lab.optimization-receipt.v1",
+      assurance: {
+        approval: "demo_ui_gesture",
+        authenticatedMerchantAuthority: false,
+        contentAddressed: true,
+        cryptographicallySigned: false,
+      },
+      representation: {
+        status: "published",
+        approvalDigest: appStore.getState().variant.approvedDigest,
+      },
+      evaluation: {
+        baseline: { score: 0, total: 8 },
+        optimized: { score: 8, total: 8 },
+      },
+      channels: {
+        shopify: { status: "preview_ready", externalWrite: false, execution: "blocked_preview" },
+        openaiAds: { status: "ready", campaignStatus: "PAUSED", externalWrite: false, projectedSpendMinor: 0 },
+      },
+      externalEffects: {
+        shopifyWrite: false,
+        adsSftpUpload: false,
+        adsApiWrite: false,
+        adsActivation: false,
+        adsSpendMinor: 0,
+        checkout: false,
+        payment: false,
+      },
+      receiptDigest: expect.stringMatching(/^sha256-v1-[a-f0-9]{64}$/),
+    });
+  });
+
+  it("keeps the portable receipt unavailable until both channel projections are complete", async () => {
+    expect(() => appStore.getOptimizationReceipt()).toThrow(/publish.*prepare/i);
+    appStore.generateVariant("Agent");
+    appStore.runEvaluation("Agent");
+    appStore.stageVariant("Agent");
+    await appStore.recordVisibleApproval();
+    await appStore.publishVariant("Agent");
+    expect(() => appStore.getOptimizationReceipt()).toThrow(/prepare/i);
+
+    await appStore.prepareAds("Agent");
+    const first = appStore.getOptimizationReceipt();
+    await appStore.prepareAds("Agent");
+    expect(appStore.getOptimizationReceipt()).toEqual(first);
   });
 
   it("resets every mutable workflow surface to the canonical demo baseline", async () => {
@@ -119,6 +165,7 @@ describe("demo lifecycle boundary", () => {
       validation: null,
       adTemplate: null,
     });
+    expect(resetState.optimizationReceipt).toBeNull();
     expect(resetState.cartQuantity).toBe(0);
     expect(resetState.webmcpAvailable).toBe(true);
     expect(resetState.activities).toHaveLength(1);

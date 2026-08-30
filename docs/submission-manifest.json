@@ -5,7 +5,7 @@
   "liveUrl": "https://conversion-lab-webmcp.vercel.app/",
   "repositoryUrl": "https://github.com/DG-creative-lab/openai-webmcp-hackathon",
   "license": "MIT",
-  "siteToolCount": 9,
+  "siteToolCount": 10,
   "video": {
     "maximumSeconds": 180,
     "plannedSeconds": 165,
@@ -24,7 +24,7 @@
     "paymentAttempted": false
   },
   "claims": {
-    "webmcp": "Nine page-scoped tools share the visible browser workspace; approval and reset are absent from the site-tool surface.",
+    "webmcp": "Ten page-scoped tools share the visible browser workspace; approval and reset are absent from the site-tool surface.",
     "shopify": "The public demo uses a deterministic fixture, with an optional server-side Shopify read adapter and a blocked productUpdate preview; it performs no live Shopify write.",
     "openaiAds": "The demo exports a locally validated Google-compatible CSV and PAUSED paid projection; it performs no SFTP upload, Ads API write, activation, or spend.",
     "approval": "The visible approval is a digest-bound credential-free demo gesture, not authenticated merchant authority."

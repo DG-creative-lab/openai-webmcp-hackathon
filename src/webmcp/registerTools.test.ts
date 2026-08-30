@@ -39,10 +39,11 @@ describe("WebMCP registration", () => {
 
   it("registers the complete narrow tool surface", async () => {
     const definitions = await createToolRegistry();
-    expect(definitions).toHaveLength(9);
+    expect(definitions).toHaveLength(10);
     expect(definitions.map((item) => item.name)).toContain("publish_approved_variant");
+    expect(definitions.map((item) => item.name)).toContain("get_optimization_receipt");
     expect(definitions.every((item) => item.inputSchema.additionalProperties === false)).toBe(true);
-    expect(definitions.filter((item) => item.annotations?.readOnlyHint)).toHaveLength(3);
+    expect(definitions.filter((item) => item.annotations?.readOnlyHint)).toHaveLength(4);
     expect(definitions.filter((item) => !item.annotations?.readOnlyHint)).toHaveLength(6);
     expect(definitions.every((item) => item.annotations?.destructiveHint === false)).toBe(true);
     expect(definitions.every((item) => item.annotations?.openWorldHint === false)).toBe(true);
@@ -73,6 +74,7 @@ describe("WebMCP registration", () => {
       organic: { ready: false },
       paid: { ready: false },
     });
+    await expect(execute("get_optimization_receipt")).rejects.toThrow(/unavailable/i);
     await expect(execute("create_evidence_led_variant")).resolves.toMatchObject({
       effect: { class: "draft", changedState: true, externalWrite: false },
       workspace: { variant: { status: "draft" } },
@@ -107,6 +109,20 @@ describe("WebMCP registration", () => {
         validation: { scope: "local_schema", valid: true, errors: [] },
       },
       projectedSpend: "GBP 0",
+    });
+    await expect(execute("get_optimization_receipt")).resolves.toMatchObject({
+      effect: { class: "read", changedState: false, externalWrite: false },
+      receipt: {
+        contractVersion: "conversion-lab.optimization-receipt.v1",
+        assurance: { cryptographicallySigned: false },
+        evaluation: { baseline: { score: 0 }, optimized: { score: 8 } },
+        receiptDigest: expect.stringMatching(/^sha256-v1-[a-f0-9]{64}$/),
+      },
+      artifact: {
+        filename: "conversion-lab-optimization-receipt.json",
+        mediaType: "application/json",
+        localDownloadOnly: true,
+      },
     });
     await expect(execute("search_product_by_need", { query: "waterproof 16-inch laptop bag" })).resolves.toMatchObject({
       effect: { class: "read" },
@@ -163,7 +179,7 @@ describe("WebMCP registration", () => {
     };
 
     await expect(registerWebMCPToolsWithRetry({ maxAttempts: 3, delayMs: 0, wait })).resolves.toBe(true);
-    expect(definitions).toHaveLength(9);
+    expect(definitions).toHaveLength(10);
     expect(appStore.getState().webmcpAvailable).toBe(true);
   });
 
@@ -196,7 +212,7 @@ describe("WebMCP registration", () => {
 
     await expect(Promise.all([registerWebMCPTools(), registerWebMCPTools()])).resolves.toEqual([true, true]);
     await expect(registerWebMCPTools()).resolves.toBe(true);
-    expect(definitions).toHaveLength(9);
+    expect(definitions).toHaveLength(10);
   });
 
   it("stops at the first rejected tool and permanently disables that host without duplicates", async () => {
@@ -220,12 +236,14 @@ describe("WebMCP registration", () => {
     expect(attemptedNames).toEqual([
       "get_growth_workspace",
       "audit_channel_readiness",
+      "get_optimization_receipt",
       "create_evidence_led_variant",
       "run_buyer_intent_battery",
     ]);
     expect(registeredNames).toEqual([
       "get_growth_workspace",
       "audit_channel_readiness",
+      "get_optimization_receipt",
       "create_evidence_led_variant",
     ]);
     expect(registeredNames).not.toContain("publish_approved_variant");
@@ -241,8 +259,8 @@ describe("WebMCP registration", () => {
       wait: async () => { waits += 1; },
     })).resolves.toBe(false);
     expect(waits).toBe(0);
-    expect(attemptedNames).toHaveLength(4);
-    expect(registeredNames).toHaveLength(3);
+    expect(attemptedNames).toHaveLength(5);
+    expect(registeredNames).toHaveLength(4);
   });
 
   it("rejects invalid retry configuration without attempting registration", async () => {
