@@ -10,11 +10,13 @@ import type {
 import { previewShopifyProductUpdate, type ShopifyOperationPreview } from "./shopifyAdminPreview";
 import { evaluateCopy } from "../domain/evaluation";
 import { serializeOpenAIAdsFeedRows } from "../domain/openaiAdsFeedExport";
-import type { AdsPackage, Evaluation, IntentResult, OpenAIProductFeedRow } from "../domain/types";
+import { validateOpenAIProductFeedRow } from "../domain/openaiProductFeed";
+import type { AdsPackage, Evaluation, FeedValidation, IntentResult, OpenAIProductFeedRow } from "../domain/types";
 
 export const OPTIMIZATION_RECEIPT_VERSION = "conversion-lab.optimization-receipt.v1" as const;
 export const OPTIMIZATION_RECEIPT_FILENAME = "conversion-lab-optimization-receipt.json" as const;
 export const BUYER_INTENT_BATTERY_VERSION = "conversion-lab.buyer-intent.v1" as const;
+export const OPTIMIZATION_RECEIPT_APPROVAL_POLICY = "conversion-lab.demo-approval.v1" as const;
 
 interface ReceiptEvaluation {
   score: number;
@@ -26,8 +28,12 @@ export interface OptimizationReceiptBody {
   contractVersion: typeof OPTIMIZATION_RECEIPT_VERSION;
   issuedAt: string;
   assurance: {
-    approval: ApprovalEnvelope["assurance"];
-    authenticatedMerchantAuthority: boolean;
+    approval: "demo_ui_gesture";
+    principalId: null;
+    policyVersion: typeof OPTIMIZATION_RECEIPT_APPROVAL_POLICY;
+    approvedAt: string;
+    expiresAt: string | null;
+    authenticatedMerchantAuthority: false;
     contentAddressed: true;
     cryptographicallySigned: false;
     verificationMethod: "sha256-v1-canonical-json";
@@ -211,7 +217,8 @@ async function assertAdsPackage(
   product: Readonly<ApprovalProductSnapshot>,
   representation: Readonly<RepresentationVariant>,
   payloadDigest: string,
-): Promise<void> {
+  validationTime: Date,
+): Promise<FeedValidation> {
   const feed = adsPackage.feed;
   const feedExport = adsPackage.feedExport;
   const validation = adsPackage.validation;
@@ -250,10 +257,15 @@ async function assertAdsPackage(
   ) {
     throw new Error("Optimisation receipt blocked: the OpenAI Ads projection is missing, changed, active, or not bound to the approved product truth.");
   }
-  const expectedExport = await serializeOpenAIAdsFeedRows({ rows: [feed] });
+  const expectedValidation = validateOpenAIProductFeedRow(feed, validationTime);
+  if (JSON.stringify(validation) !== JSON.stringify(expectedValidation)) {
+    throw new Error("Optimisation receipt blocked: the complete independent Ads validation result, including unresolved acceptance checks, is required.");
+  }
+  const expectedExport = await serializeOpenAIAdsFeedRows({ rows: [feed], now: validationTime });
   if (feedExport.contents !== expectedExport.contents || feedExport.contentDigest !== expectedExport.contentDigest) {
     throw new Error("Optimisation receipt blocked: the Ads feed contents do not match their declared content digest.");
   }
+  return expectedValidation;
 }
 
 function freshness(records: readonly EvidenceRecord[]): "fixture" | "live" | "mixed" {
@@ -261,16 +273,23 @@ function freshness(records: readonly EvidenceRecord[]): "fixture" | "live" | "mi
   return values.size === 1 ? records[0].provenance.freshness : "mixed";
 }
 
-function receiptBody(input: OptimizationReceiptInput, payloadDigest: string): OptimizationReceiptBody {
+function receiptBody(
+  input: OptimizationReceiptInput,
+  payloadDigest: string,
+  adsValidation: Readonly<FeedValidation>,
+): OptimizationReceiptBody {
   const evidence = [...input.evidence].sort((left, right) => left.id.localeCompare(right.id));
   const observedAt = evidence.map((record) => record.provenance.observedAt).sort();
-  const authenticatedMerchantAuthority = input.approval.assurance === "authenticated_merchant";
   return {
     contractVersion: OPTIMIZATION_RECEIPT_VERSION,
     issuedAt: input.issuedAt,
     assurance: {
-      approval: input.approval.assurance,
-      authenticatedMerchantAuthority,
+      approval: "demo_ui_gesture",
+      principalId: null,
+      policyVersion: OPTIMIZATION_RECEIPT_APPROVAL_POLICY,
+      approvedAt: input.approval.approvedAt,
+      expiresAt: input.approval.expiresAt,
+      authenticatedMerchantAuthority: false,
       contentAddressed: true,
       cryptographicallySigned: false,
       verificationMethod: "sha256-v1-canonical-json",
@@ -326,7 +345,7 @@ function receiptBody(input: OptimizationReceiptInput, payloadDigest: string): Op
           scope: "local_schema",
           valid: true,
           errors: [],
-          unverified: [...input.adsPackage.validation!.unverified],
+          unverified: [...adsValidation.unverified],
         },
         export: {
           format: "google-compatible-csv",
@@ -375,19 +394,29 @@ export async function createOptimizationReceipt(
     || Date.parse(captured.issuedAt) > capturedNow.getTime()) {
     throw new Error("Optimisation receipt blocked: approval, publication, and issuance timestamps are inconsistent.");
   }
+  if (captured.approval.assurance !== "demo_ui_gesture") {
+    throw new Error("Optimisation receipt blocked: v1 supports only the credential-free demo approval assurance.");
+  }
+  if (captured.approval.policyVersion !== OPTIMIZATION_RECEIPT_APPROVAL_POLICY) {
+    throw new Error("Optimisation receipt blocked: the approval policy is unsupported.");
+  }
+  if (captured.approval.expiresAt !== null && (
+    !isCanonicalTimestamp(captured.approval.expiresAt)
+    || Date.parse(captured.approval.expiresAt) <= Date.parse(captured.approval.approvedAt)
+    || Date.parse(captured.approval.expiresAt) <= Date.parse(captured.issuedAt)
+  )) {
+    throw new Error("Optimisation receipt blocked: the approval expiry is invalid or no longer current at issuance.");
+  }
   if (captured.representation.status !== "published") {
     throw new Error("Optimisation receipt blocked: the exact approved representation must be published first.");
   }
-  if (captured.approval.assurance === "authenticated_merchant" && !captured.approval.principalId) {
-    throw new Error("Optimisation receipt blocked: authenticated merchant assurance requires a principal ID.");
-  }
-  if (captured.approval.assurance === "demo_ui_gesture" && captured.approval.principalId !== null) {
+  if (captured.approval.principalId !== null) {
     throw new Error("Optimisation receipt blocked: the demo approval gesture cannot claim an authenticated principal.");
   }
 
   const verified = await verifyApprovalBinding(captured);
-  if (verified.evidence.some((record) => Date.parse(record.provenance.observedAt) > Date.parse(captured.issuedAt))) {
-    throw new Error("Optimisation receipt blocked: evidence cannot be observed after receipt issuance.");
+  if (verified.evidence.some((record) => Date.parse(record.provenance.observedAt) >= Date.parse(captured.approval.approvedAt))) {
+    throw new Error("Optimisation receipt blocked: every evidence observation must predate approval.");
   }
   assertEvaluation("Baseline", captured.baselineCopy, verified.evidence, verified.approval.target, captured.baselineEvaluation);
   assertEvaluation("Optimized", verified.representation.copy, verified.evidence, verified.approval.target, captured.optimizedEvaluation);
@@ -395,9 +424,15 @@ export async function createOptimizationReceipt(
     throw new Error("Optimisation receipt blocked: the approved representation does not improve the deterministic intent score.");
   }
   await assertShopifyPreview(captured.shopifyPreview, verified.approval, verified.representation, verified.evidence);
-  await assertAdsPackage(captured.adsPackage, verified.approval.productSnapshot, verified.representation, verified.payloadDigest);
+  const adsValidation = await assertAdsPackage(
+    captured.adsPackage,
+    verified.approval.productSnapshot,
+    verified.representation,
+    verified.payloadDigest,
+    new Date(captured.issuedAt),
+  );
 
-  const body = receiptBody(captured, verified.payloadDigest);
+  const body = receiptBody(captured, verified.payloadDigest, adsValidation);
   return deepFreeze({ ...body, receiptDigest: await digest(canonicalOptimizationReceiptJson(body)) });
 }
 
