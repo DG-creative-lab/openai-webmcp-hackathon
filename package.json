@@ -14,6 +14,7 @@
     "test:unit": "vitest run src",
     "test:adversarial": "vitest run tests/adversarial",
     "test:infrastructure": "node --test tests/infrastructure/*.test.mjs",
+    "test:submission": "node scripts/submission-readiness.mjs",
     "test:coverage": "vitest run --coverage",
     "test:smoke": "playwright test",
     "test:deployment": "playwright test --config playwright.deployment.config.ts",

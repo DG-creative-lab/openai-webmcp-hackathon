@@ -1,8 +1,8 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import { registerWebMCPTools } from "./webmcp/registerTools";
+import { registerWebMCPToolsWithRetry } from "./webmcp/registerTools";
 
-registerWebMCPTools().catch((error) => {
+registerWebMCPToolsWithRetry().catch((error) => {
   console.error("WebMCP tool registration failed", error);
 });
 

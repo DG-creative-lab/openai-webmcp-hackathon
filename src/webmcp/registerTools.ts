@@ -18,6 +18,15 @@ const stateChangeAnnotations = {
   openWorldHint: false,
 };
 
+const registeredHosts = new WeakSet<object>();
+const registrationAttempts = new WeakMap<object, Promise<boolean>>();
+
+export interface WebMCPRegistrationRetryOptions {
+  maxAttempts?: number;
+  delayMs?: number;
+  wait?: (delayMs: number) => Promise<void>;
+}
+
 type ToolEffectClass = "read" | "draft" | "evaluation" | "stage" | "demo_publish" | "paid_projection" | "demo_cart";
 
 interface ToolEffect {
@@ -158,11 +167,20 @@ function cartQuantity(input: unknown): number {
 }
 
 export async function registerWebMCPTools(): Promise<boolean> {
-  const registerTool = document.modelContext?.registerTool?.bind(document.modelContext);
-  if (!registerTool) {
+  const host = document.modelContext;
+  if (!host || typeof host.registerTool !== "function") {
     appStore.setWebmcpAvailable(false);
     return false;
   }
+  const registerTool = host.registerTool.bind(host);
+
+  if (registeredHosts.has(host)) {
+    appStore.setWebmcpAvailable(true);
+    return true;
+  }
+
+  const pendingAttempt = registrationAttempts.get(host);
+  if (pendingAttempt) return pendingAttempt;
 
   const tools = [
     {
@@ -296,7 +314,36 @@ export async function registerWebMCPTools(): Promise<boolean> {
     },
   ];
 
-  await Promise.all(tools.map((tool) => registerTool(tool)));
-  appStore.setWebmcpAvailable(true);
-  return true;
+  const attempt = Promise.all(tools.map((tool) => registerTool(tool)))
+    .then(() => {
+      registeredHosts.add(host);
+      appStore.setWebmcpAvailable(true);
+      return true;
+    })
+    .finally(() => {
+      registrationAttempts.delete(host);
+    });
+
+  registrationAttempts.set(host, attempt);
+  return attempt;
+}
+
+export async function registerWebMCPToolsWithRetry({
+  maxAttempts = 10,
+  delayMs = 500,
+  wait = (duration) => new Promise((resolve) => window.setTimeout(resolve, duration)),
+}: WebMCPRegistrationRetryOptions = {}): Promise<boolean> {
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
+    throw new Error("WebMCP registration maxAttempts must be a positive integer.");
+  }
+  if (!Number.isFinite(delayMs) || delayMs < 0) {
+    throw new Error("WebMCP registration delayMs must be a non-negative number.");
+  }
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    if (await registerWebMCPTools()) return true;
+    if (attempt < maxAttempts) await wait(delayMs);
+  }
+
+  return false;
 }

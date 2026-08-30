@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "conversion-lab.submission.v1",
+  "productName": "Conversion Lab",
+  "tagline": "Turn verified product truth into agent conversion readiness across organic and paid discovery.",
+  "liveUrl": "https://conversion-lab-webmcp.vercel.app/",
+  "repositoryUrl": "https://github.com/DG-creative-lab/openai-webmcp-hackathon",
+  "license": "MIT",
+  "siteToolCount": 9,
+  "video": {
+    "maximumSeconds": 180,
+    "plannedSeconds": 165,
+    "publicUrl": null
+  },
+  "claims": {
+    "webmcp": "Nine page-scoped tools share the visible browser workspace; approval and reset are absent from the site-tool surface.",
+    "shopify": "The public demo uses a deterministic fixture, with an optional server-side Shopify read adapter and a blocked productUpdate preview; it performs no live Shopify write.",
+    "openaiAds": "The demo exports a locally validated Google-compatible CSV and PAUSED paid projection; it performs no SFTP upload, Ads API write, activation, or spend.",
+    "approval": "The visible approval is a digest-bound credential-free demo gesture, not authenticated merchant authority."
+  },
+  "externalAcceptance": {
+    "scriptedPublicJourney": {
+      "status": "passed",
+      "evidence": "2026-08-29: Playwright Chromium completed 1/1 against https://conversion-lab-webmcp.vercel.app/ using a standards-shaped injected document.modelContext host; this is not native ChatGPT WebMCP acceptance."
+    },
+    "nativeChatgptWebmcpJourney": {
+      "status": "pending",
+      "evidence": null
+    },
+    "secondCleanSession": {
+      "status": "pending",
+      "evidence": null
+    },
+    "publicVideo": {
+      "status": "pending",
+      "evidence": null
+    },
+    "devpostSubmission": {
+      "status": "pending",
+      "evidence": null
+    }
+  }
+}

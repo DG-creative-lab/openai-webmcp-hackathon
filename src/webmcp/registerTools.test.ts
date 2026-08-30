@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { appStore } from "../store/appStore";
-import { registerWebMCPTools } from "./registerTools";
+import { registerWebMCPTools, registerWebMCPToolsWithRetry } from "./registerTools";
 
 type ToolDefinition = {
   name: string;
@@ -148,5 +148,61 @@ describe("WebMCP registration", () => {
 
     await expect(registerWebMCPTools()).resolves.toBe(false);
     expect(appStore.getState().webmcpAvailable).toBe(false);
+  });
+
+  it("registers when the browser host appears during the bounded retry window", async () => {
+    const definitions: ToolDefinition[] = [];
+    const browserDocument: { modelContext?: { registerTool: (definition: ToolDefinition) => Promise<void> } } = {};
+    Object.defineProperty(globalThis, "document", { configurable: true, value: browserDocument });
+    const wait = async () => {
+      browserDocument.modelContext = {
+        registerTool: async (definition) => {
+          definitions.push(definition);
+        },
+      };
+    };
+
+    await expect(registerWebMCPToolsWithRetry({ maxAttempts: 3, delayMs: 0, wait })).resolves.toBe(true);
+    expect(definitions).toHaveLength(9);
+    expect(appStore.getState().webmcpAvailable).toBe(true);
+  });
+
+  it("stops after the configured number of unavailable-host attempts", async () => {
+    Object.defineProperty(globalThis, "document", { configurable: true, value: {} });
+    let waits = 0;
+
+    await expect(registerWebMCPToolsWithRetry({
+      maxAttempts: 3,
+      delayMs: 0,
+      wait: async () => { waits += 1; },
+    })).resolves.toBe(false);
+    expect(waits).toBe(2);
+    expect(appStore.getState().webmcpAvailable).toBe(false);
+  });
+
+  it("does not duplicate tools across concurrent or repeated registration", async () => {
+    const definitions: ToolDefinition[] = [];
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: {
+        modelContext: {
+          registerTool: async (definition: ToolDefinition) => {
+            await Promise.resolve();
+            definitions.push(definition);
+          },
+        },
+      },
+    });
+
+    await expect(Promise.all([registerWebMCPTools(), registerWebMCPTools()])).resolves.toEqual([true, true]);
+    await expect(registerWebMCPTools()).resolves.toBe(true);
+    expect(definitions).toHaveLength(9);
+  });
+
+  it("rejects invalid retry configuration without attempting registration", async () => {
+    Object.defineProperty(globalThis, "document", { configurable: true, value: {} });
+
+    await expect(registerWebMCPToolsWithRetry({ maxAttempts: 0 })).rejects.toThrow(/positive integer/i);
+    await expect(registerWebMCPToolsWithRetry({ delayMs: -1 })).rejects.toThrow(/non-negative/i);
   });
 });

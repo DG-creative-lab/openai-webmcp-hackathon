@@ -9,10 +9,11 @@ The quality system is deliberately layered. Agents may help discover failure cas
 | Unit and narrow contracts | `make test-unit` | Evaluation, approval digests, store behavior, WebMCP registration schemas | Seconds |
 | Adversarial | `make test-adversarial` | Illegal lifecycle edges, stale authority, hostile runtime values, unsupported claims, prohibited agent capabilities | Seconds |
 | Infrastructure | `make test-infrastructure` | Change-impact mapping and conservative fallback behavior | Seconds |
+| Submission contract | `make test-submission` | Required public links, license, claims, video duration and honest external-checkpoint status | Seconds |
 | Coverage gate | `make test-coverage` | Unit and adversarial behavior across domain, store, and WebMCP control modules | Seconds |
 | Browser smoke | `make test-smoke` | Real page boot, tool discovery, shared session state, visible approval checkpoint, publication, digest-bound Ads CSV download, shopper recommendation and cart | Under a minute |
 | Deployment smoke | `make test-deployment` | Production Vite output, static assets, and the complete Vercel-shaped browser journey | Under a minute |
-| Complete merge gate | `make test-all` | Diff hygiene, typecheck, coverage thresholds, production build and browser journey | Under a few minutes |
+| Complete merge gate | `make test-all` | Diff hygiene, typecheck, submission contract, coverage thresholds, production build and browser journey | Under a few minutes |
 
 Coverage is intentionally scoped to `src/commerce`, `src/domain`, `src/store`, and `src/webmcp/registerTools.ts`, where deterministic product, adapter and authority logic lives. The current thresholds are 85% statements, functions and lines, and 75% branches. The browser suite supplies behavioral evidence for React composition; these numbers are not presented as whole-system coverage.
 
@@ -48,4 +49,8 @@ The `$webmcp-quality-harness` skill in `.agents/skills` gives future Codex sessi
 
 The browser smoke test supplies a standards-shaped `document.modelContext` host before the app loads. It verifies that the nine tools are discoverable and executable in one shared page session. Its scripted click at the approval checkpoint is synthetic test setup, not evidence of human identity or authorization. The actual Codex in-app-browser journey remains a separate acceptance check for the browser's native WebMCP implementation.
 
+Production startup retries host discovery ten times over approximately 4.5 seconds so a browser that injects `document.modelContext` just after page boot can still receive the tool surface. Registration is idempotent per browser host, including concurrent attempts; unit tests cover late availability, the bounded unavailable-host fallback, invalid retry configuration, and duplicate prevention.
+
 The deployment smoke serves the generated `dist` directory through Vite preview and repeats the complete journey against production output. Set `DEPLOYMENT_BASE_URL=https://<deployment>.vercel.app` when invoking `pnpm test:deployment` to run the same deterministic journey against a Vercel preview or production deployment without starting a local server. This still does not replace the native WebMCP acceptance journey in a clean ChatGPT browser session.
+
+The submission contract validates the repository-owned portion of challenge readiness. It checks the manifest, public links, MIT license, bounded claims, and under-three-minute video plan. It deliberately allows external checkpoints to remain `pending`; a native WebMCP run, second clean session, public video, and final Devpost submission may be marked `passed` only with explicit evidence. A green merge gate therefore never masquerades as completed external acceptance.
