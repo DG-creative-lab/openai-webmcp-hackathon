@@ -14,7 +14,7 @@ The public demo exposes the same deeply frozen receipt through the read-only `ge
 | `assurance` | Supported approval policy, null demo principal, approval/expiry chronology, and explicit content-addressed, unsigned status |
 | `target` / `productSnapshot` | Native Shopify identity and exact approved commercial fields |
 | `representation` | Published copy, evidence IDs, approval digest and lifecycle times |
-| `evidenceSet` | Complete versioned evidence, target identity, provenance and freshness |
+| `evidenceSet` | Complete versioned evidence, target identity, provenance, freshness, and numeric UTC min/max normalized to fixed-width ISO timestamps |
 | `evaluation` | Reproducible baseline and optimized results for buyer-intent battery v1 |
 | `channels.shopify` | API version, blocked update-preview state and approval payload digest |
 | `channels.openaiAds` | Locally validated feed row, ad template, export digests, SFTP prerequisite and PAUSED/£0 state |

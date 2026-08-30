@@ -273,13 +273,21 @@ function freshness(records: readonly EvidenceRecord[]): "fixture" | "live" | "mi
   return values.size === 1 ? records[0].provenance.freshness : "mixed";
 }
 
+function observationRange(records: readonly EvidenceRecord[]): { earliest: string; latest: string } {
+  const timestamps = records.map((record) => Date.parse(record.provenance.observedAt));
+  return {
+    earliest: new Date(Math.min(...timestamps)).toISOString(),
+    latest: new Date(Math.max(...timestamps)).toISOString(),
+  };
+}
+
 function receiptBody(
   input: OptimizationReceiptInput,
   payloadDigest: string,
   adsValidation: Readonly<FeedValidation>,
 ): OptimizationReceiptBody {
   const evidence = [...input.evidence].sort((left, right) => left.id.localeCompare(right.id));
-  const observedAt = evidence.map((record) => record.provenance.observedAt).sort();
+  const observedAt = observationRange(evidence);
   return {
     contractVersion: OPTIMIZATION_RECEIPT_VERSION,
     issuedAt: input.issuedAt,
@@ -311,8 +319,8 @@ function receiptBody(
     },
     evidenceSet: {
       freshness: freshness(evidence),
-      earliestObservedAt: observedAt[0],
-      latestObservedAt: observedAt.at(-1)!,
+      earliestObservedAt: observedAt.earliest,
+      latestObservedAt: observedAt.latest,
       records: evidence.map((record) => structuredClone(record)),
     },
     evaluation: {

@@ -237,6 +237,30 @@ describe("portable optimisation receipt", () => {
       .rejects.toThrow(/evidence observation must predate approval/i);
   });
 
+  it("derives a chronological evidence range from mixed timestamp precision", async () => {
+    const input = await completedInput();
+    const evidence = structuredClone(input.evidence);
+    evidence.forEach((record, index) => {
+      record.provenance.observedAt = index === 0
+        ? "2026-08-30T07:00:00Z"
+        : `2026-08-30T07:00:00.00${index}Z`;
+    });
+    const coordinated = await rebuildBindings(input, {
+      approval: { approvedAt: "2026-08-30T08:00:00.000Z" },
+      evidence,
+      publishedAt: "2026-08-30T08:02:00.000Z",
+      issuedAt: "2026-08-30T08:03:00.000Z",
+    });
+
+    const receipt = await createOptimizationReceipt(coordinated, { now: new Date("2026-08-30T12:00:00.000Z") });
+    expect(receipt.evidenceSet).toMatchObject({
+      earliestObservedAt: "2026-08-30T07:00:00.000Z",
+      latestObservedAt: "2026-08-30T07:00:00.007Z",
+    });
+    expect(Date.parse(receipt.evidenceSet.earliestObservedAt))
+      .toBeLessThanOrEqual(Date.parse(receipt.evidenceSet.latestObservedAt));
+  });
+
   it("rejects unsupported approval policy, expired approval, and unrepresentable assurance", async () => {
     const unsupportedPolicy = structuredClone(await completedInput());
     (unsupportedPolicy.approval as { policyVersion: string }).policyVersion = "unrecognized-policy";
