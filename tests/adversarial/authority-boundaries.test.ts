@@ -227,8 +227,10 @@ describe("adversarial authority and lifecycle boundaries", () => {
 
   it.each([
     ["waterproof bag for a 17-inch laptop", ["supported", "contradicted"]],
+    ["waterproof bag that fits a 17-inch laptop", ["supported", "contradicted"]],
     ["waterproof bag under £150", ["supported", "contradicted"]],
     ["not waterproof", ["contradicted"]],
+    ["waterproof bag that does not fit a 16-inch laptop", ["supported", "supported", "unknown"]],
     ["waterproof 16-inch laptop with solar charging", ["supported", "supported", "unknown"]],
   ])("does not recommend when one material constraint in %s is unmet", async (query, statuses) => {
     await reach("published");
