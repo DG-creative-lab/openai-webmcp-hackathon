@@ -2,7 +2,7 @@
 
 Status: active product and delivery baseline  
 Date: 2026-08-28  
-Current horizon: Stage 1 — WebMCP Challenge MVP
+Current horizon: Stage 1 — WebMCP Challenge MVP, with a conditional Stage 1.5 portability proof
 
 ## Product decision
 
@@ -13,6 +13,8 @@ It helps a merchant answer and improve one commercially important question:
 > When a buyer asks an agent for a product like mine, can the agent find the right product, verify why it fits, and carry the same approved truth into organic and paid acquisition?
 
 The product is not a generic WebMCP installer. Shopify already supplies catalog, cart, and navigation WebMCP tools on Liquid storefronts and its Hydrogen developer preview. Conversion Lab differentiates by measuring agent-selection readiness, finding evidence gaps, producing evidence-bound product representations, testing them against buyer intent, preserving exact merchant approval, and projecting the approved result across channels.
+
+Conversion Lab is also not identical to its current website. The Vercel application is the first reference host. The product direction is one headless optimisation core with SaaS, Shopify, SDK/API, CLI, MCP, WebMCP and agentic-platform delivery surfaces. The detailed architecture and authority allocation are defined in [PLUGGABLE-ARCHITECTURE.md](PLUGGABLE-ARCHITECTURE.md).
 
 ## Product outcome and boundaries
 
@@ -45,6 +47,7 @@ Across every stage:
 | Stage | Product state | Primary customer evidence | Exit condition |
 | --- | --- | --- | --- |
 | 1. Hackathon MVP | Judge-ready WebMCP product proof | Complete human-agent journey and challenge criteria | Public app, repository, video, submission, and repeatable acceptance run before the deadline |
+| 1.5. Pluggable Core proof | Reference host demonstrably separated from reusable engine | Same snapshot produces equivalent SDK/CLI and web results | DOM-free core, web-host adoption, CLI/SDK parity and unchanged native WebMCP journey before feature freeze |
 | 2. Standalone/pluggable beta | Useful merchant or agency workflow | Design partners use it on real catalogues and return observed value signals | Repeatable audit-to-approved-publication workflow for multiple products and merchants |
 | 3. Agentic-commerce module | Governed capability pack inside the larger platform | Cross-system jobs produce typed results and receipts without bypassing authority | Versioned external-agent contract, golden fixtures, lifecycle proof, and end-to-end platform run |
 | 4. Learning growth product | Evidence-led cross-channel optimisation system | Observed selection and conversion outcomes improve later decisions | Measured outcome loop, safe adaptation, provider expansion, and a validated commercial model |
@@ -195,6 +198,46 @@ Deferred from the hackathon:
 | Sep 2 | Feature freeze, video, submission text, screenshots | Final release candidate and submission package |
 | Sep 3 | Buffer, final verification, submit before 9:00 p.m. BST | Devpost confirmation and immutable release tag |
 
+## Stage 1.5 — Pluggable Core proof
+
+Priority: conditional stretch after the Stage 1 submission cut line is green.
+
+### Why this slice exists
+
+The current application already contains portable domain contracts, evaluators, approval binding, Shopify/Ads projectors and optimisation receipts, but the reference host still assembles fixture truth and lifecycle through a process-wide in-memory store. The proof should demonstrate that Conversion Lab is the reusable product and the website is one host without introducing production infrastructure that cannot be completed or evidenced before submission.
+
+### Deliverables
+
+- Extract a DOM-free application core over injected commerce snapshot, clock, workspace and channel dependencies.
+- Make the existing React and WebMCP paths consume one instance of that core, retaining visible shared state.
+- Export a repository-local TypeScript SDK for audit, evaluation and receipt verification.
+- Add a CLI over the same SDK with versioned JSON input/output.
+- Include one non-React example and golden parity fixtures across web, SDK and CLI.
+- Document SaaS, Shopify, HTTP API, MCP and agentic-platform forms as future adapters over the same capabilities.
+
+### Preconditions
+
+- Native ChatGPT WebMCP journey passes against the production app.
+- A second clean-session rehearsal passes.
+- The receipt-hardening follow-up is merged and production is green.
+- The slice can merge and deploy before the September 2 internal freeze.
+
+### Cut line
+
+Included: core extraction, existing-host adoption, SDK entry point, read/evaluation/verification CLI, examples and deterministic parity tests.
+
+Excluded: public HTTP API, MCP server, npm publication, Shopify OAuth, live Shopify write, persistence, multi-tenancy, authenticated merchant authority, Ads upload/API activation, billing and agentic-platform migration.
+
+### Exit condition
+
+- The demo journey and ten WebMCP tools remain behaviorally unchanged.
+- Core code imports no React, DOM, browser or page-scoped WebMCP concerns.
+- CLI audit works from a clean checkout without browser automation or credentials.
+- Equivalent inputs preserve product identity, evidence decisions, evaluation and receipt verification across web and CLI/SDK paths.
+- Full deterministic gates and native WebMCP acceptance pass after extraction.
+
+If any precondition or exit evidence cannot be satisfied by feature freeze, defer the slice without weakening the Stage 1 submission. Full design: [PLUGGABLE-ARCHITECTURE.md](PLUGGABLE-ARCHITECTURE.md).
+
 ## Stage 2 — Standalone and pluggable beta
 
 Target window: four to eight weeks after the challenge, gated by merchant evidence rather than calendar alone.
@@ -212,6 +255,8 @@ Core job:
 > Audit which buyer needs an agent can verify, improve the product representation without inventing claims, approve it once, publish it safely, and learn whether agent-channel outcomes improve.
 
 ### Product capabilities
+
+Stage 2 unifies three commercial forms around the same core: a hosted SaaS control plane, a Shopify embedded host/connector, and a headless contract consumed through SDK or HTTP jobs. CLI, MCP and WebMCP remain thin clients or adapters rather than parallel implementations.
 
 - Shopify OAuth, app installation, tenant isolation, and least-privilege scopes.
 - Multi-product ingestion, batch readiness scoring, prioritization, and evidence gap queues.
@@ -321,6 +366,8 @@ Roadmap progress may be updated when evidence is executable. A material promise,
 | Pricing unit | Deferred | Willingness-to-pay conversations and usage shape |
 | Platform integration timing | After standalone contracts and target approval refactor stabilize | Cross-repo schema review and refactor checkpoint |
 | Observed outcome source | Deferred | Shopify/Agentic analytics, Ads insights, referral attribution, or merchant analytics access |
+| Canonical product architecture | One headless core with multiple delivery adapters | Stage 1.5 parity proof and Stage 2 design-partner onboarding |
+| SDK/API/MCP sequencing | SDK and CLI first; authenticated job API before MCP | Consumer spike, persistence/idempotency design and agent-host demand |
 
 ## Evidence baseline
 

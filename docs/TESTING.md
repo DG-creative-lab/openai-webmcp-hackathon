@@ -54,3 +54,19 @@ Production startup retries host discovery ten times over approximately 4.5 secon
 The deployment smoke serves the generated `dist` directory through Vite preview and repeats the complete journey against production output. Set `DEPLOYMENT_BASE_URL=https://<deployment>.vercel.app` when invoking `pnpm test:deployment` to run the same deterministic journey against a Vercel preview or production deployment without starting a local server. This still does not replace the native WebMCP acceptance journey in a clean ChatGPT browser session.
 
 The submission contract validates the repository-owned portion of challenge readiness. It checks the manifest, public links, MIT license, structured capability facts, capability-derived claims, and under-three-minute video plan. It deliberately allows external checkpoints to remain `pending`; a native WebMCP run, second clean session, public video, and final Devpost submission may be marked `passed` only with checkpoint-specific dated metadata and related evidence or receipt URLs. A green merge gate therefore never masquerades as completed external acceptance.
+
+## Planned Stage 1.5 portability evidence
+
+The pluggable-core work is not implemented yet. When it begins, the quality portfolio must add evidence at the module and composed-system boundaries rather than treating a new package layout as proof of decoupling:
+
+| Evidence | Protects |
+| --- | --- |
+| Import-boundary test | Core and SDK do not depend on React, DOM, browser globals, `document.modelContext` or the reference fixture |
+| Golden snapshot parity | Web host, SDK and CLI preserve identity, evidence, audit and evaluation semantics for the same versioned input |
+| CLI contract tests | Versioned JSON stdout, stderr diagnostics, stable exit codes and no approval or external-effect commands |
+| Host-instance tests | Two engine instances cannot share lifecycle, approval, cart or activity state accidentally |
+| Authority mutation suite | CLI/API/MCP wrappers cannot broaden approval, target scope, evidence freshness or effect class |
+| Existing browser/deployment journey | Core extraction does not regress the ten-tool visible shared-state experience |
+| Native ChatGPT acceptance | The deployed WebMCP adapter still registers and completes the actual human-agent journey |
+
+The implementation branch should begin with `make test-affected BASE_REF=origin/main` and finish with `make test-all`. A successful CLI run cannot replace browser acceptance, and a successful browser run cannot prove SDK/CLI parity. The canonical design and cut line are in [PLUGGABLE-ARCHITECTURE.md](PLUGGABLE-ARCHITECTURE.md).

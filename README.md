@@ -1,8 +1,16 @@
 # Conversion Lab — WebMCP commerce growth demo
 
-Conversion Lab is a WebMCP-native growth workspace for commerce teams. It helps a merchant turn verified product facts into product copy that agents can reliably discover, evaluate and recommend—then projects that same approved truth into organic Shopify discovery and an OpenAI Ads product-feed package.
+Conversion Lab is an agent-conversion optimisation layer for commerce, demonstrated through a WebMCP-native reference workspace. It helps a merchant turn verified product facts into product copy that agents can reliably discover, evaluate and recommend—then projects that same approved truth into organic Shopify discovery and an OpenAI Ads product-feed package.
 
 The demo merchant is the fictional urban-outdoor retailer **Fieldwork Supply**. Its hero product is a £159 modular waterproof commuter backpack/pannier.
+
+## Product shape and portability
+
+The current Vercel app is both the merchant workspace and a reference Shopify-style storefront. It proves the complete human-agent workflow in one browser session, but it is not yet an installable Shopify app, public SDK, hosted API or multi-tenant SaaS.
+
+The accepted product direction is one headless Conversion Lab core with several adapters: the React SaaS workspace, Shopify app and storefront connector, TypeScript SDK, CLI, future HTTP API, MCP server, WebMCP page adapter and agentic-commerce capability pack. These are delivery surfaces over the same versioned identities, evidence, lifecycle, approval, projection and receipt contracts—not separate product implementations.
+
+The bounded post-MVP proof will extract that core, make this website consume it, and add a repository-local SDK plus read/evaluation/receipt-verification CLI. Until that work lands, portability is an architectural direction rather than a shipped installation claim. See [docs/PLUGGABLE-ARCHITECTURE.md](docs/PLUGGABLE-ARCHITECTURE.md) for the decision, authority model, implementation cut line and acceptance evidence.
 
 ## Why this exists
 
@@ -107,7 +115,7 @@ Create work on `feature/<short-name>` or `fix/<short-name>` branches. Use `make 
 
 The suite includes unit/contract coverage, bounded adversarial lifecycle and authority tests, and a Playwright agent-assisted browser journey. See [docs/TESTING.md](docs/TESTING.md) for the test map, CI policy, coverage scope and repo-local `$webmcp-quality-harness` skill.
 
-Product delivery is organized across hackathon, standalone beta, platform-integration, and learning-growth stages in [docs/PRODUCT-ROADMAP.md](docs/PRODUCT-ROADMAP.md). The repo-local `$conversion-lab-product-steward` skill helps future Codex sessions select milestones, preserve cut lines, and validate material external changes before proposing roadmap shifts.
+Product delivery is organized across the hackathon MVP, bounded pluggable-core proof, standalone beta, platform integration, and learning-growth stages in [docs/PRODUCT-ROADMAP.md](docs/PRODUCT-ROADMAP.md). The repo-local `$conversion-lab-product-steward` skill helps future Codex sessions select milestones, preserve cut lines, and validate material external changes before proposing roadmap shifts.
 
 ## Demo flow
 
@@ -134,7 +142,7 @@ The reset control is deliberately absent from the WebMCP site-tool surface. It r
 
 ## Product boundaries
 
-The judge-facing application uses a deterministic, local evidence and evaluation engine so it remains verifiable without Shopify or Ads credentials. An optional server-side dev-store reader now proves Shopify Admin API ingestion through the same versioned product, evidence, provenance, identity and receipt contracts. Live Shopify publication remains a separate governed slice; the other production extension points include OpenAI Ads campaign management and Delta Feed updates after merchant onboarding, measurement events, and a configurable intent-evaluation library.
+The judge-facing application uses a deterministic, local evidence and evaluation engine so it remains verifiable without Shopify or Ads credentials. Today that engine is still assembled through the reference app's in-memory singleton store; it is not yet a published standalone module. An optional server-side dev-store reader proves Shopify Admin API ingestion through the same versioned product, evidence, provenance, identity and receipt contracts. The planned pluggable core will move host concerns behind explicit catalogue, repository, clock, approval and channel ports without changing the visible WebMCP journey. Live Shopify publication remains a separate governed slice; the other production extension points include OpenAI Ads campaign management and Delta Feed updates after merchant onboarding, measurement events, and a configurable intent-evaluation library.
 
 The OpenAI Ads projection includes the documented Google-compatible core fields, marks the item Ads-eligible, and truthfully sets `identifier_exists` to `no` for this fictional product. An independent local validator checks required fields, identifier rules (including the 70-character MPN limit), field lengths, credential-free URL syntax, price format and supported availability. Every exported commercial field is derived from the product snapshot inside the approval envelope; the projection accepts no separate product object that could substitute SKU, brand, price, inventory-derived availability or URLs. The app serializes the exact approved row into a deterministic UTF-8 CSV, records both the approval payload digest and file-content digest, and offers the artifact for local download. It cannot prove URL reachability, merchant/feed configuration, SFTP transfer, or acceptance by OpenAI processing, and the UI reports those limits. Initial feed connection and catalogue upload happen through Ads Manager and SFTP rather than the public Advertiser API; the credential-free demo never pretends to provision a feed or activate spend.
 
