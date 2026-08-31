@@ -2,7 +2,7 @@
 
 Status: active product and delivery baseline  
 Date: 2026-08-28  
-Current horizon: Stage 1 — WebMCP Challenge MVP
+Current horizon: Stage 1 — WebMCP Challenge MVP, with a conditional Stage 1.5 portability proof
 
 ## Product decision
 
@@ -13,6 +13,8 @@ It helps a merchant answer and improve one commercially important question:
 > When a buyer asks an agent for a product like mine, can the agent find the right product, verify why it fits, and carry the same approved truth into organic and paid acquisition?
 
 The product is not a generic WebMCP installer. Shopify already supplies catalog, cart, and navigation WebMCP tools on Liquid storefronts and its Hydrogen developer preview. Conversion Lab differentiates by measuring agent-selection readiness, finding evidence gaps, producing evidence-bound product representations, testing them against buyer intent, preserving exact merchant approval, and projecting the approved result across channels.
+
+Conversion Lab is also not identical to its current website. The Vercel application is the first reference host. The product direction is one headless optimisation core with SaaS, Shopify, SDK/API, CLI, MCP, WebMCP and agentic-platform delivery surfaces. The detailed architecture and authority allocation are defined in [PLUGGABLE-ARCHITECTURE.md](PLUGGABLE-ARCHITECTURE.md).
 
 ## Product outcome and boundaries
 
@@ -36,7 +38,7 @@ Across every stage:
 - The model may interpret demand, propose copy, select evidence, plan tests, and explain tradeoffs.
 - Shopify, merchant systems, and verified source records attest product truth and identity.
 - Deterministic code owns schemas, lifecycle guards, hashes, budgets, and test gates.
-- The merchant owns approval for publication or paid effects.
+- The merchant owns representation approval. A production host must separately authorize each exact external effect, bound to capability, channel, destination/account, projection digest, limits/budget, expiry, revocation and replay semantics.
 - A successful simulation or synthetic score is never reported as observed commercial lift.
 - Checkout, payment, or campaign activation requires a separate product and authority decision.
 
@@ -45,6 +47,7 @@ Across every stage:
 | Stage | Product state | Primary customer evidence | Exit condition |
 | --- | --- | --- | --- |
 | 1. Hackathon MVP | Judge-ready WebMCP product proof | Complete human-agent journey and challenge criteria | Public app, repository, video, submission, and repeatable acceptance run before the deadline |
+| 1.5. Pluggable Core proof | Reference host demonstrably separated from reusable engine | Same snapshot produces equivalent SDK/CLI and web results | DOM-free core, web-host adoption, CLI/SDK parity and unchanged native WebMCP journey before feature freeze |
 | 2. Standalone/pluggable beta | Useful merchant or agency workflow | Design partners use it on real catalogues and return observed value signals | Repeatable audit-to-approved-publication workflow for multiple products and merchants |
 | 3. Agentic-commerce module | Governed capability pack inside the larger platform | Cross-system jobs produce typed results and receipts without bypassing authority | Versioned external-agent contract, golden fixtures, lifecycle proof, and end-to-end platform run |
 | 4. Learning growth product | Evidence-led cross-channel optimisation system | Observed selection and conversion outcomes improve later decisions | Measured outcome loop, safe adaptation, provider expansion, and a validated commercial model |
@@ -195,6 +198,46 @@ Deferred from the hackathon:
 | Sep 2 | Feature freeze, video, submission text, screenshots | Final release candidate and submission package |
 | Sep 3 | Buffer, final verification, submit before 9:00 p.m. BST | Devpost confirmation and immutable release tag |
 
+## Stage 1.5 — Pluggable Core proof
+
+Priority: conditional stretch after the Stage 1 submission cut line is green.
+
+### Why this slice exists
+
+The current application already contains portable domain contracts, evaluators, approval binding, Shopify/Ads projectors and optimisation receipts, but the reference host still assembles fixture truth and lifecycle through a process-wide in-memory store. The proof should demonstrate that Conversion Lab is the reusable product and the website is one host without introducing production infrastructure that cannot be completed or evidenced before submission.
+
+### Deliverables
+
+- Extract a DOM-free application core over injected commerce snapshot, clock, workspace and channel dependencies.
+- Make the existing React and WebMCP paths consume one instance of that core, retaining visible shared state.
+- Export a repository-local TypeScript SDK for audit, evaluation and receipt verification.
+- Add a CLI over the same SDK with versioned JSON input/output.
+- Include one non-React example and golden parity fixtures across web, SDK and CLI.
+- Document SaaS, Shopify, HTTP API, MCP and agentic-platform forms as future adapters over the same capabilities.
+
+### Preconditions
+
+- Native ChatGPT WebMCP journey passes against the production app.
+- A second clean-session rehearsal passes.
+- The receipt-hardening follow-up is merged and production is green.
+- The slice can merge and deploy before the September 2 internal freeze.
+
+### Cut line
+
+Included: core extraction, existing-host adoption, SDK entry point, read/evaluation/verification CLI, examples and deterministic parity tests.
+
+Excluded: public HTTP API, MCP server, npm publication, Shopify OAuth, live Shopify write, persistence, multi-tenancy, authenticated merchant authority, Ads upload/API activation, billing and agentic-platform migration.
+
+### Exit condition
+
+- The demo journey and ten WebMCP tools remain behaviorally unchanged.
+- Core code imports no React, DOM, browser or page-scoped WebMCP concerns.
+- CLI audit works from a clean checkout without browser automation or credentials.
+- Equivalent inputs preserve product identity, evidence decisions, evaluation and receipt verification across web and CLI/SDK paths.
+- Full deterministic gates and native WebMCP acceptance pass after extraction.
+
+If any precondition or exit evidence cannot be satisfied by feature freeze, defer the slice without weakening the Stage 1 submission. Full design: [PLUGGABLE-ARCHITECTURE.md](PLUGGABLE-ARCHITECTURE.md).
+
 ## Stage 2 — Standalone and pluggable beta
 
 Target window: four to eight weeks after the challenge, gated by merchant evidence rather than calendar alone.
@@ -212,6 +255,8 @@ Core job:
 > Audit which buyer needs an agent can verify, improve the product representation without inventing claims, approve it once, publish it safely, and learn whether agent-channel outcomes improve.
 
 ### Product capabilities
+
+Stage 2 unifies three commercial forms around the same core: a hosted SaaS control plane, a Shopify embedded host/connector, and a headless contract consumed through SDK or HTTP jobs. CLI, MCP and WebMCP remain thin clients or adapters rather than parallel implementations.
 
 - Shopify OAuth, app installation, tenant isolation, and least-privilege scopes.
 - Multi-product ingestion, batch readiness scoring, prioritization, and evidence gap queues.
@@ -254,9 +299,9 @@ Integrate through the target platform’s signed, idempotent external-agent job 
 | `propose_evidence_bound_representation` | Proposal | Candidate copy plus evidence bindings | No publication authority |
 | `evaluate_agent_selection` | Read/simulation | Frozen task battery and comparative result | Synthetic evidence labeled and versioned |
 | `stage_representation_for_approval` | Internal reversible effect | Approval-ready immutable candidate | Exact product, evidence and payload digest |
-| `publish_approved_representation` | External governed effect | Shopify receipt and rollback reference | Current approval envelope and native identity revalidated |
-| `prepare_paid_channel_projection` | Preview or governed effect | Feed/PAUSED Ads receipt | Account scope, approval, PAUSED state and idempotency required |
-| `observe_agent_channel_outcomes` | Read/feedback | Normalized organic/paid observations | Source identity, dedupe, completeness and time window retained |
+| `publish_approved_representation` | External governed effect | Shopify receipt and rollback reference | Exact Shopify effect grant binds capability, destination, projection, limits and replay; revalidated immediately before execution |
+| `prepare_paid_channel_projection` | Preview or governed effect | Feed/PAUSED Ads receipt | Preview needs no execution authority; any write requires an exact Ads effect grant bound to account, projection, PAUSED state, budget and replay |
+| `observe_agent_channel_outcomes` | Read/feedback | Normalized organic/paid observations | Tenant/product, channel/account, representation digest, effect lineage, native IDs, dedupe, completeness and time window retained |
 
 ### Cross-system contract
 
@@ -268,16 +313,19 @@ Conversion Lab objects map into the platform without semantic compression:
 | Evidence record | Evidence/observation | Never becomes permission or product truth without source authority |
 | Buyer-intent battery | Query battery/experiment task set | Freeze version for comparisons |
 | Representation variant | Experiment candidate | Immutable content and evidence digest |
-| Merchant approval | Workflow approval envelope | Bind principal, target, payload, evidence, policy, version and expiry |
-| Shopify/Ads effect receipt | Capability receipt | Idempotent native ID, result, uncertainty and rollback owner |
-| Outcome observation | Validation/calibration input | Keep observed, synthetic and inferred signals distinct |
+| Merchant approval | Workflow approval envelope | Bind tenant, principal, target, representation payload, evidence, policy, version and expiry; no implicit channel authority |
+| Exact effect grant | Governed capability authorization | Bind capability, channel, operation, native destination/account, target, approval/representation/projection digests, limits/budget, policy, expiry, revocation and replay semantics; consume through one durable fenced ledger claim |
+| Shopify/Ads effect receipt | Capability receipt | Retain grant/claim IDs, fencing token, attempt, projection digest, bound idempotency key, native IDs, result, uncertainty and rollback owner |
+| Outcome observation | Validation/calibration input | Bind tenant/product, channel/account, representation and projection/effect lineage, native IDs and window; keep observed, synthetic and inferred signals distinct and mark unresolved attribution partial/unknown |
 
 ### Integration acceptance
 
 - Versioned schemas and golden fixtures pass in both repositories.
-- Duplicate job delivery cannot duplicate publication or paid effects.
+- Duplicate or simultaneous job delivery cannot duplicate publication or paid effects: only one atomic replay-ledger claim may call the provider, and ambiguous outcomes block takeover until reconciliation.
+- A representation approval or Shopify-targeted effect grant cannot authorize an Ads effect, another account/destination, changed projection, larger budget or replay under a new key.
 - A platform model or memory artifact cannot manufacture merchant approval.
 - Partial, stale, unavailable, and contradictory evidence remain visible in platform summaries.
+- Overlapping representation windows and product-level outcomes without effect lineage remain partial/unknown and cannot be reported as exact candidate lift.
 - The initial integration stays within the platform’s current bounded sequential operating envelope.
 - One end-to-end job can audit, propose, pause for exact approval, execute a controlled effect, return a signed receipt, and ingest a later observation.
 
@@ -321,6 +369,8 @@ Roadmap progress may be updated when evidence is executable. A material promise,
 | Pricing unit | Deferred | Willingness-to-pay conversations and usage shape |
 | Platform integration timing | After standalone contracts and target approval refactor stabilize | Cross-repo schema review and refactor checkpoint |
 | Observed outcome source | Deferred | Shopify/Agentic analytics, Ads insights, referral attribution, or merchant analytics access |
+| Canonical product architecture | One headless core with multiple delivery adapters | Stage 1.5 parity proof and Stage 2 design-partner onboarding |
+| SDK/API/MCP sequencing | SDK and CLI first; authenticated job API before MCP | Consumer spike, persistence/idempotency design and agent-host demand |
 
 ## Evidence baseline
 

@@ -7,6 +7,8 @@
 
 The public demo exposes the same deeply frozen receipt through the read-only `get_optimization_receipt` WebMCP tool and a local JSON download named `conversion-lab-optimization-receipt.json`.
 
+The receipt is also the first portable boundary between the current reference host and future Conversion Lab delivery surfaces. A CLI, SDK, HTTP API, MCP server, Shopify host or agentic-commerce platform may transport or verify it under the same contract. Transport does not confer approval or execution authority.
+
 ## Contract map
 
 | Section | Meaning |
@@ -35,4 +37,6 @@ The repository implementation is `canonicalOptimizationReceiptJson()` plus `veri
 
 This browser artifact is content-addressed, not cryptographically signed. Anyone can create a new body and digest, so a matching digest proves only that the downloaded body has not changed since that digest was calculated. It does not prove merchant identity, Shopify execution, OpenAI feed acceptance, Ads activation, spend or downstream ingestion. Receipt v1 accepts only `conversion-lab.demo-approval.v1` with `demo_ui_gesture` assurance and a null principal; authenticated merchant assurance is deliberately rejected until a production host can represent and verify it faithfully.
 
-A production host should validate this v1 input, bind it to its authenticated tenant/workflow/approval policy, then issue its own signed and idempotent capability receipt for any governed external effect. Conversion Lab should not inherit that host authority merely because this portable artifact exists.
+A production host should validate this v1 input and bind it to its authenticated tenant/workflow/representation-approval policy. Before any governed external effect, it must issue and revalidate a separate exact effect grant bound to the capability, channel, operation, native destination/account, target, approval/representation/projection digests, limits or budget, policy, expiry, revocation state and replay semantics. After execution it should issue its own signed, idempotent capability receipt. Conversion Lab should not inherit that host authority merely because this portable artifact exists.
+
+The planned Stage 1.5 CLI may verify receipt integrity and semantic compatibility but must not convert a valid receipt into a Shopify write, Ads upload, activation, spend, checkout or payment. See [PLUGGABLE-ARCHITECTURE.md](PLUGGABLE-ARCHITECTURE.md) for the cross-surface authority model.

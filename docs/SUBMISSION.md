@@ -4,21 +4,25 @@ Status: repository-ready draft; external acceptance items are tracked in [`submi
 
 ## Submission identity
 
-**Product:** Conversion Lab  
-**Tagline:** Turn verified product truth into agent conversion readiness across organic and paid discovery.  
-**Live demo:** https://conversion-lab-webmcp.vercel.app/  
-**Source:** https://github.com/DG-creative-lab/openai-webmcp-hackathon  
-**License:** MIT
+| Field | Value |
+| --- | --- |
+| Product | Conversion Lab |
+| Tagline | A pluggable agent-conversion optimisation layer for organic and paid commerce discovery. |
+| Live demo | https://conversion-lab-webmcp.vercel.app/ |
+| Source | https://github.com/DG-creative-lab/openai-webmcp-hackathon |
+| License | MIT |
 
 ## Devpost-ready description
 
 Commerce teams optimise product pages for people, but buying agents need something more explicit: facts they can discover, verify, and connect to a shopper's constraints. A suitable product can lose the recommendation simply because its generic copy hides the evidence that proves the fit.
 
-Conversion Lab is an agent conversion readiness workspace for commerce. In one visible browser session, an agent inspects eight merchant-controlled product facts, measures the current listing against eight buyer intents, creates an evidence-bound representation, and stages it for review. The browser user can record exact digest-bound demo approval; approval and reset are deliberately absent from the WebMCP site-tool surface. After approval, the agent publishes the same representation to the demo storefront, prepares a locally validated OpenAI Ads product-feed CSV and PAUSED paid projection, exports a content-addressed optimisation receipt, verifies a shopper need constraint by constraint, and updates the shared cart without entering checkout.
+Conversion Lab is a pluggable agent-conversion optimisation layer for commerce, demonstrated through a WebMCP-native reference workspace. In one visible browser session, an agent inspects eight merchant-controlled product facts, measures the current listing against eight buyer intents, creates an evidence-bound representation, and stages it for review. The browser user can record exact digest-bound demo approval; approval and reset are deliberately absent from the WebMCP site-tool surface. After approval, the agent publishes the same representation to the demo storefront, prepares a locally validated OpenAI Ads product-feed CSV and PAUSED paid projection, exports a content-addressed optimisation receipt, verifies a shopper need constraint by constraint, and updates the shared cart without entering checkout.
 
 The product demonstrates how WebMCP can become a growth surface rather than a thin automation layer. Ten page-scoped tools let the agent reason over the same product, evidence, lifecycle, paid projection, portable receipt, and cart state that the merchant sees. Deterministic controls preserve product identity, evidence provenance, exact approval, lifecycle legality, and zero-spend boundaries while leaving the agent free to inspect, propose, test, and explain.
 
 The public experience is credential-free and repeatable. It uses a deterministic Fieldwork Supply fixture, a versioned Shopify Admin read/update-preview adapter contract, and a digest-bound Google-compatible Ads feed export. It does not claim a live Shopify write, OpenAI feed acceptance, SFTP delivery, Ads API activation, campaign spend, authenticated merchant identity, checkout, payment, or measured commercial lift.
+
+The current website is the first reference host, not yet an installable merchant integration. The product architecture defines one future headless core with web, Shopify, SDK/API, CLI, MCP, WebMCP and agentic-platform adapters. Until the bounded portability proof is implemented and tested, the submission must not claim that those additional delivery surfaces ship in the public build.
 
 ## Judging-criteria map
 
@@ -28,6 +32,8 @@ The public experience is credential-free and repeatable. It uses a deterministic
 | Execution | Public Vercel app, narrow schemas, effect metadata, digest-bound approval, deterministic tests, downloadable CSV and JSON receipt, visible shared cart, and graceful non-WebMCP fallback. |
 | Specific impact | Moves a generic listing from 0/8 to 8/8 verifiable buyer-intent coverage and reuses one approved truth across organic and paid preparation. |
 | Creativity | Treats agent discoverability as a conversion discipline, connecting merchant evidence, agent selection, channel consistency, and paid relevance without inventing claims. |
+
+If the Stage 1.5 proof lands before feature freeze, the execution and impact evidence may additionally state that the reference website and CLI/SDK consume the same versioned optimisation core. Do not add that claim based on architecture documentation alone.
 
 ## What is real, projected, and deferred
 
