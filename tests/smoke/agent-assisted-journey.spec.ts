@@ -157,7 +157,7 @@ test("an agent discovers the tools and completes the journey around the visible 
   });
 
   const recommendation = await executeTool(page, "search_product_by_need", {
-    query: "I need a waterproof bag for a 16-inch laptop",
+    query: "I need a waterproof bag that fits a 16-inch laptop",
   }) as { match: boolean; evidence: unknown[]; constraints: Array<{ status: string }> };
   expect(recommendation.match).toBe(true);
   expect(recommendation.evidence.length).toBeGreaterThanOrEqual(2);

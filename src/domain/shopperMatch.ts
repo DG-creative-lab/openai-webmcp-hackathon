@@ -75,7 +75,7 @@ export function evaluateShopperNeed(
     }
   });
 
-  const laptopMatches = [...query.matchAll(/\b(\d+(?:\.\d+)?)\s*(?:-| )?inch(?:es)?(?:\s+laptop)?\b/g)];
+  const laptopMatches = [...query.matchAll(/\b(?:(?:that\s+)?fits?\s+(?:a\s+)?)?(\d+(?:\.\d+)?)\s*(?:-| )?inch(?:es)?(?:\s+laptop)?\b/g)];
   for (const match of laptopMatches) {
     const requestedSize = Number.parseFloat(match[1]);
     const item = byId.get("ev-laptop");

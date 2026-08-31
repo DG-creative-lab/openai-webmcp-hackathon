@@ -124,7 +124,7 @@ describe("WebMCP registration", () => {
         localDownloadOnly: true,
       },
     });
-    await expect(execute("search_product_by_need", { query: "waterproof 16-inch laptop bag" })).resolves.toMatchObject({
+    await expect(execute("search_product_by_need", { query: "I need a waterproof bag that fits a 16-inch laptop" })).resolves.toMatchObject({
       effect: { class: "read" },
       match: true,
       constraints: [

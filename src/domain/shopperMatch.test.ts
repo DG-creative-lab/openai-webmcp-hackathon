@@ -13,11 +13,14 @@ describe("shopper constraint evaluation", () => {
 
   it.each([
     ["waterproof bag for a 16-inch laptop under £170", true, ["supported", "supported", "supported"]],
+    ["I need a waterproof bag that fits a 16-inch laptop", true, ["supported", "supported"]],
     ["waterproof laptop backpack", true, ["supported", "supported"]],
     ["waterproof bag for a 17-inch laptop", false, ["supported", "contradicted"]],
+    ["waterproof bag that fits a 17-inch laptop", false, ["supported", "contradicted"]],
     ["waterproof bag under £150", false, ["supported", "contradicted"]],
     ["waterproof bag under £159", false, ["supported", "contradicted"]],
     ["not waterproof", false, ["contradicted"]],
+    ["waterproof bag that does not fit a 16-inch laptop", false, ["supported", "supported", "unknown"]],
     ["waterproof 16-inch laptop with solar charging", false, ["supported", "supported", "unknown"]],
     ["solar powered self-cleaning backpack", false, ["unknown"]],
   ] as const)("evaluates every material constraint in %s", (query, match, statuses) => {
