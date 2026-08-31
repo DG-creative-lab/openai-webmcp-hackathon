@@ -11,10 +11,10 @@ The public demo exposes the same deeply frozen receipt through the read-only `ge
 
 | Section | Meaning |
 | --- | --- |
-| `assurance` | Approval class plus explicit content-addressed, unsigned status |
+| `assurance` | Supported approval policy, null demo principal, approval/expiry chronology, and explicit content-addressed, unsigned status |
 | `target` / `productSnapshot` | Native Shopify identity and exact approved commercial fields |
 | `representation` | Published copy, evidence IDs, approval digest and lifecycle times |
-| `evidenceSet` | Complete versioned evidence, target identity, provenance and freshness |
+| `evidenceSet` | Complete versioned evidence, target identity, provenance, freshness, and numeric UTC min/max normalized to fixed-width ISO timestamps |
 | `evaluation` | Reproducible baseline and optimized results for buyer-intent battery v1 |
 | `channels.shopify` | API version, blocked update-preview state and approval payload digest |
 | `channels.openaiAds` | Locally validated feed row, ad template, export digests, SFTP prerequisite and PAUSED/£0 state |
@@ -27,12 +27,12 @@ The public demo exposes the same deeply frozen receipt through the read-only `ge
 2. Serialize the remaining JSON recursively: arrays keep order; object keys are sorted lexicographically at every level; strings, booleans, finite numbers and `null` use JSON encoding.
 3. Hash the UTF-8 bytes with SHA-256 and prefix the lowercase hexadecimal result with `sha256-v1-`.
 4. Compare the result to `receiptDigest`.
-5. Independently enforce the semantic contract before operational use: supported version, target ownership, evidence authority, approval policy, lifecycle, channel mode and zero-effect declarations.
+5. Independently enforce the semantic contract before operational use: supported version, target ownership, evidence authority and chronology, approval policy and expiry, lifecycle, complete Ads caveats, channel mode and zero-effect declarations.
 
-The repository implementation is `canonicalOptimizationReceiptJson()` plus `verifyOptimizationReceiptDigest()` in `src/commerce/optimizationReceipt.ts`. Creation also independently recomputes the approval, buyer-intent evaluations, complete Shopify preview and Ads export before issuing the receipt.
+The repository implementation is `canonicalOptimizationReceiptJson()` plus `verifyOptimizationReceiptDigest()` in `src/commerce/optimizationReceipt.ts`. Creation also independently recomputes the approval, buyer-intent evaluations, complete Shopify preview, Ads validation caveats and Ads export before issuing the receipt. Every evidence observation must predate approval, and any non-null approval expiry must remain current at issuance.
 
 ## Assurance boundary
 
-This browser artifact is content-addressed, not cryptographically signed. Anyone can create a new body and digest, so a matching digest proves only that the downloaded body has not changed since that digest was calculated. It does not prove merchant identity, Shopify execution, OpenAI feed acceptance, Ads activation, spend or downstream ingestion.
+This browser artifact is content-addressed, not cryptographically signed. Anyone can create a new body and digest, so a matching digest proves only that the downloaded body has not changed since that digest was calculated. It does not prove merchant identity, Shopify execution, OpenAI feed acceptance, Ads activation, spend or downstream ingestion. Receipt v1 accepts only `conversion-lab.demo-approval.v1` with `demo_ui_gesture` assurance and a null principal; authenticated merchant assurance is deliberately rejected until a production host can represent and verify it faithfully.
 
 A production host should validate this v1 input, bind it to its authenticated tenant/workflow/approval policy, then issue its own signed and idempotent capability receipt for any governed external effect. Conversion Lab should not inherit that host authority merely because this portable artifact exists.

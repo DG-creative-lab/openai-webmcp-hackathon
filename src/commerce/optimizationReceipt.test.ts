@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { RepresentationVariant } from "./contracts";
+import { digestApprovalPayload } from "./approvalBinding";
+import type { ApprovalEnvelope, EvidenceRecord, RepresentationVariant } from "./contracts";
+import { prepareOpenAIAdsFeedProjection } from "./openaiAdsFeedProjection";
+import { previewShopifyProductUpdate } from "./shopifyAdminPreview";
 import {
   OPTIMIZATION_RECEIPT_FILENAME,
   canonicalOptimizationReceiptJson,
@@ -46,6 +49,52 @@ async function completedInput(): Promise<OptimizationReceiptInput> {
   };
 }
 
+async function rebuildBindings(
+  input: OptimizationReceiptInput,
+  {
+    approval: approvalChanges = {},
+    evidence = input.evidence,
+    publishedAt = input.publishedAt,
+    issuedAt = input.issuedAt,
+  }: {
+    approval?: Partial<ApprovalEnvelope>;
+    evidence?: readonly EvidenceRecord[];
+    publishedAt?: string;
+    issuedAt?: string;
+  },
+): Promise<OptimizationReceiptInput> {
+  const approvalSeed: ApprovalEnvelope = { ...input.approval, ...approvalChanges };
+  const payloadDigest = await digestApprovalPayload({
+    target: approvalSeed.target,
+    productSnapshot: approvalSeed.productSnapshot,
+    copy: input.representation.copy,
+    evidence,
+  });
+  const approval: ApprovalEnvelope = { ...approvalSeed, payloadDigest };
+  const representation: RepresentationVariant = { ...input.representation, payloadDigest };
+  const shopifyPreview = await previewShopifyProductUpdate({ approval, representation, evidence });
+  const projection = await prepareOpenAIAdsFeedProjection({ approval, representation, evidence });
+  return {
+    ...input,
+    approval,
+    representation,
+    evidence,
+    shopifyPreview,
+    adsPackage: {
+      ...input.adsPackage,
+      status: "ready",
+      campaignStatus: "PAUSED",
+      ...projection,
+      adTemplate: {
+        headline: representation.copy.title,
+        description: representation.copy.description,
+      },
+    },
+    publishedAt,
+    issuedAt,
+  };
+}
+
 describe("portable optimisation receipt", () => {
   beforeEach(() => appStore.reset());
 
@@ -59,6 +108,10 @@ describe("portable optimisation receipt", () => {
       contractVersion: "conversion-lab.optimization-receipt.v1",
       assurance: {
         approval: "demo_ui_gesture",
+        principalId: null,
+        policyVersion: "conversion-lab.demo-approval.v1",
+        approvedAt: input.approval.approvedAt,
+        expiresAt: null,
         authenticatedMerchantAuthority: false,
         contentAddressed: true,
         cryptographicallySigned: false,
@@ -74,7 +127,18 @@ describe("portable optimisation receipt", () => {
       },
       channels: {
         shopify: { operation: "update_product", status: "preview_ready", externalWrite: false },
-        openaiAds: { campaignStatus: "PAUSED", projectedSpendMinor: 0, externalWrite: false },
+        openaiAds: {
+          campaignStatus: "PAUSED",
+          projectedSpendMinor: 0,
+          externalWrite: false,
+          validation: {
+            unverified: [
+              "Product and image URLs resolve with HTTP 200",
+              "Registered merchant name and feed configuration are accepted by OpenAI",
+              "The row is accepted during OpenAI feed processing",
+            ],
+          },
+        },
       },
       externalEffects: { shopifyWrite: false, adsActivation: false, adsSpendMinor: 0, payment: false },
       receiptDigest: expect.stringMatching(/^sha256-v1-[a-f0-9]{64}$/),
@@ -149,6 +213,82 @@ describe("portable optimisation receipt", () => {
     const changedAdTemplate = structuredClone(await completedInput());
     changedAdTemplate.adsPackage.adTemplate!.headline = "Unapproved paid headline";
     await expect(createOptimizationReceipt(changedAdTemplate)).rejects.toThrow(/Ads projection/i);
+  });
+
+  it("recomputes and preserves every unresolved Ads acceptance caveat", async () => {
+    const missingCaveats = structuredClone(await completedInput());
+    missingCaveats.adsPackage.validation!.unverified = [];
+
+    await expect(createOptimizationReceipt(missingCaveats)).rejects.toThrow(/unresolved acceptance checks/i);
+  });
+
+  it("requires evidence to predate approval even when every digest and channel projection is rebuilt", async () => {
+    const input = await completedInput();
+    const evidence = structuredClone(input.evidence);
+    evidence[0].provenance.observedAt = "2026-08-30T08:01:00.000Z";
+    const coordinated = await rebuildBindings(input, {
+      approval: { approvedAt: "2026-08-30T08:00:00.000Z" },
+      evidence,
+      publishedAt: "2026-08-30T08:02:00.000Z",
+      issuedAt: "2026-08-30T08:03:00.000Z",
+    });
+
+    await expect(createOptimizationReceipt(coordinated, { now: new Date("2026-08-30T12:00:00.000Z") }))
+      .rejects.toThrow(/evidence observation must predate approval/i);
+  });
+
+  it("derives a chronological evidence range from mixed timestamp precision", async () => {
+    const input = await completedInput();
+    const evidence = structuredClone(input.evidence);
+    evidence.forEach((record, index) => {
+      record.provenance.observedAt = index === 0
+        ? "2026-08-30T07:00:00Z"
+        : `2026-08-30T07:00:00.00${index}Z`;
+    });
+    const coordinated = await rebuildBindings(input, {
+      approval: { approvedAt: "2026-08-30T08:00:00.000Z" },
+      evidence,
+      publishedAt: "2026-08-30T08:02:00.000Z",
+      issuedAt: "2026-08-30T08:03:00.000Z",
+    });
+
+    const receipt = await createOptimizationReceipt(coordinated, { now: new Date("2026-08-30T12:00:00.000Z") });
+    expect(receipt.evidenceSet).toMatchObject({
+      earliestObservedAt: "2026-08-30T07:00:00.000Z",
+      latestObservedAt: "2026-08-30T07:00:00.007Z",
+    });
+    expect(Date.parse(receipt.evidenceSet.earliestObservedAt))
+      .toBeLessThanOrEqual(Date.parse(receipt.evidenceSet.latestObservedAt));
+  });
+
+  it("rejects unsupported approval policy, expired approval, and unrepresentable assurance", async () => {
+    const unsupportedPolicy = structuredClone(await completedInput());
+    (unsupportedPolicy.approval as { policyVersion: string }).policyVersion = "unrecognized-policy";
+    await expect(createOptimizationReceipt(unsupportedPolicy)).rejects.toThrow(/policy is unsupported/i);
+
+    appStore.reset();
+    const expired = structuredClone(await completedInput());
+    (expired.approval as { expiresAt: string | null }).expiresAt = expired.approval.approvedAt;
+    await expect(createOptimizationReceipt(expired)).rejects.toThrow(/approval expiry/i);
+
+    appStore.reset();
+    const authenticated = structuredClone(await completedInput());
+    (authenticated.approval as { assurance: string }).assurance = "authenticated_merchant";
+    (authenticated.approval as { principalId: string | null }).principalId = "merchant-123";
+    await expect(createOptimizationReceipt(authenticated)).rejects.toThrow(/supports only.*demo approval/i);
+  });
+
+  it("carries a valid optional approval expiry for downstream policy enforcement", async () => {
+    const expiring = structuredClone(await completedInput());
+    (expiring.approval as { expiresAt: string | null }).expiresAt = "2099-01-01T00:00:00.000Z";
+
+    const receipt = await createOptimizationReceipt(expiring);
+    expect(receipt.assurance).toMatchObject({
+      principalId: null,
+      policyVersion: "conversion-lab.demo-approval.v1",
+      approvedAt: expiring.approval.approvedAt,
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    });
   });
 
   it("rejects pre-publication state and inconsistent lifecycle timestamps", async () => {

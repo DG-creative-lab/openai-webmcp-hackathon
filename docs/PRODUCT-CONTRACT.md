@@ -18,7 +18,7 @@ A judge can watch a generic listing move from 0/8 to 8/8 deterministic buyer-int
 6. The app remains useful when WebMCP is unavailable.
 7. No WebMCP site tool may approve or reset the demonstration workspace; UI availability is not an authorization boundary.
 8. Shopper matching requires verified evidence represented in the current visible copy; hidden merchant evidence is not discoverability.
-9. A portable receipt exists only after the exact approved publication, blocked Shopify update preview, locally valid Ads export and PAUSED projection agree. It is content-addressed and explicitly unsigned; it never implies that an external effect occurred.
+9. A portable receipt exists only after pre-approval evidence, a supported current approval policy, the exact approved publication, complete local Ads caveats, blocked Shopify update preview, locally valid Ads export and PAUSED projection agree. It carries approval policy/expiry context, is content-addressed and explicitly unsigned, and never implies that an external effect occurred.
 
 ## Current adapters
 
