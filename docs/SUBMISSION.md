@@ -4,11 +4,13 @@ Status: repository-ready draft; external acceptance items are tracked in [`submi
 
 ## Submission identity
 
-**Product:** Conversion Lab  
-**Tagline:** A pluggable agent-conversion optimisation layer for organic and paid commerce discovery.
-**Live demo:** https://conversion-lab-webmcp.vercel.app/  
-**Source:** https://github.com/DG-creative-lab/openai-webmcp-hackathon  
-**License:** MIT
+| Field | Value |
+| --- | --- |
+| Product | Conversion Lab |
+| Tagline | A pluggable agent-conversion optimisation layer for organic and paid commerce discovery. |
+| Live demo | https://conversion-lab-webmcp.vercel.app/ |
+| Source | https://github.com/DG-creative-lab/openai-webmcp-hackathon |
+| License | MIT |
 
 ## Devpost-ready description
 

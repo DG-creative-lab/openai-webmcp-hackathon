@@ -75,8 +75,10 @@ The core must not import React, browser globals, `document.modelContext`, a hard
 - Buyer-intent batteries and deterministic evaluation.
 - Immutable representation candidates and legal lifecycle transitions.
 - Exact approval payload construction and verification.
+- Exact effect-grant validation without widening representation approval into execution authority.
 - Channel projection validation and effect classification.
 - Content-addressed optimisation receipts and semantic verification.
+- Outcome lineage that preserves which representation and provider effect produced each observation.
 
 ### Host- or adapter-owned responsibilities
 
@@ -85,11 +87,13 @@ The core must not import React, browser globals, `document.modelContext`, a hard
 | `CatalogueSource` | Load products and evidence | Preserve tenant, provider identity, provenance, freshness and partial states |
 | `WorkspaceRepository` | Persist workspace and lifecycle state | Optimistic concurrency or equivalent stale-write protection |
 | `Clock` | Supply validation and issuance time | Valid UTC time; deterministic substitute in tests |
-| `ApprovalAuthority` | Attest principal, policy, scope and expiry | Approval bound to exact target, snapshot, representation and evidence digest |
+| `ApprovalAuthority` | Attest principal, policy, scope and expiry for a representation decision | Approval bound to exact tenant, target, snapshot, representation and evidence digest; representation approval alone cannot authorize a channel effect |
+| `EffectAuthority` | Issue or revoke an exact execution grant after projection | Grant binds capability, channel, operation, native destination/account, approval and representation digests, projection digest, effect limits, policy, expiry and replay semantics |
+| `ReplayLedger` | Own durable logical-effect consumption and reconciliation state | Atomically claim one grant/effect with compare-and-set, lease and fencing token; never infer safety from an in-memory lock or provider idempotency alone |
 | `ChannelProjector` | Prepare provider-specific preview | No execution authority; explicit unsupported and failure states |
-| `ChannelExecutor` | Perform a governed external effect | Current grant, idempotency, native identity, observation and rollback contract |
+| `ChannelExecutor` | Perform a governed external effect | Only the current replay-ledger claim owner may call the provider; revalidate the exact grant/projection after claim and persist the outcome before releasing ownership |
 | `ReceiptSink` | Store or transmit portable receipts | Receipt integrity is not treated as execution authority |
-| `OutcomeObserver` | Return later channel outcomes | Preserve source, window, completeness and synthetic/observed distinction |
+| `OutcomeObserver` | Return later channel outcomes | Bind tenant/product, channel/account, representation digest, projection/effect receipt, native effect IDs and observation window; unresolved attribution remains partial or unknown |
 
 The Stage 1.5 proof needs only an in-memory repository, injected clock, fixture/JSON catalogue source, existing preview projectors and receipt export. Production authorities and executors remain deferred.
 
@@ -105,11 +109,60 @@ The same semantic capabilities may be exposed by the SDK, API, CLI, MCP, WebMCP 
 | `stageRepresentationForApproval` | Internal reversible state | Evaluated candidate | Approval-ready immutable state | None |
 | `applyApprovalEnvelope` | Authority ingestion | Host-attested exact approval envelope | Approved lifecycle state or normalized rejection | None by itself |
 | `prepareChannelProjection` | Preview | Current approval, representation and evidence | Shopify/Ads preview with effect metadata | None |
-| `executeApprovedProjection` | Governed effect | Current authenticated grant and idempotency key | Provider effect receipt and rollback reference | Possible; deferred |
+| `executeApprovedProjection` | Governed effect | Exact projection plus the current fenced replay-ledger claim on one immutable effect grant | Provider effect receipt and rollback reference | Possible; deferred |
+| `observeChannelOutcomes` | Read/feedback | Exact effect lineage and bounded observation window | Attributed, partial or unknown observations with completeness | None |
 | `exportOptimizationReceipt` | Read/export | Complete mutually consistent workflow | Content-addressed portable receipt | Local artifact only |
 | `verifyOptimizationReceipt` | Read | Portable receipt | Integrity and semantic validation result | None |
 
 Surface names may be idiomatic, but their inputs, authority and effects must map to these capabilities without semantic loss.
+
+## Exact effect authorization
+
+Representation approval and effect authorization are separate claims. An `ApprovalEnvelope` records that an exact evidence-bound representation passed the host's decision policy. It does not authorize Shopify publication, an Ads write or any other channel operation by itself.
+
+Before an external effect, the authenticated host must issue one immutable `EffectGrant` bound to:
+
+| Grant field | Required meaning |
+| --- | --- |
+| Grant identity | Versioned grant ID and tenant/workflow scope |
+| Principal and policy | Authenticated principal, policy version, issued time and expiry |
+| Exact capability | Semantic capability and operation, such as Shopify product publication or PAUSED Ads update |
+| Channel destination | Provider, channel, native store/account and destination resource IDs |
+| Product target | Provider-native product identity within the same tenant scope |
+| Approved truth | Approval payload digest and representation digest |
+| Exact projection | Projection digest and provider payload identity |
+| Effect limits | Capability-specific allowed fields, quantity, required status and zero or bounded monetary budget |
+| Revocation | Current revocation reference/version and non-revoked state |
+| Replay policy | `single_use` or explicitly bounded idempotent retry, including one logical effect ID, the bound idempotency key and maximum permitted attempts; never authority for a second effect |
+
+`executeApprovedProjection` must synchronously capture the grant and projection, atomically claim the logical effect in the durable replay ledger, then revalidate every binding immediately before execution. It must reject a mismatched capability, channel, operation, destination/account, target, approval or representation digest, projection digest, limit, policy, expiry, revocation version or replay state. The logical effect and idempotency key are part of the grant; a caller cannot choose a new key to create a second effect, and a retry may only reconcile or complete that same logical effect. Provider credentials prove only that a request can be made, not that this effect is authorized.
+
+### Durable replay-ledger lifecycle
+
+The ledger is keyed by tenant, grant ID and logical effect ID. Its state is authoritative across processes and survives worker restarts:
+
+```text
+issued
+  └─ atomic compare-and-set claim ─→ claimed(claimId, workerId, fencingToken, leaseUntil, attempt)
+                                      ├─→ succeeded(effect receipt / native IDs)
+                                      ├─→ failed(authoritative no-effect result)
+                                      └─→ ambiguous(unknown provider outcome)
+
+ambiguous ── provider reconciliation ─→ succeeded | failed
+failed ── bounded idempotent-retry policy only ─→ claimed(new claimId, higher fence, same logical effect/key)
+```
+
+Execution follows these rules:
+
+1. All workers may validate inputs, but exactly one may atomically transition `issued → claimed`. A compare-and-set loser returns the current ledger state and must not call the provider.
+2. The claim carries a unique claim ID, monotonically increasing fencing token, bounded lease and attempt number. Ledger writes from stale or lower-fenced workers are rejected.
+3. The winner revalidates current claim ownership, fencing token, unexpired lease, grant, projection, revocation, expiry, limits and replay policy after claiming and immediately before the provider request.
+4. The winner records `succeeded`, `failed` or `ambiguous` durably. Provider success followed by a process crash is treated as potentially ambiguous, never as safe to replay.
+5. Claim lease expiry does not automatically permit takeover. It transitions or is reconciled to `ambiguous` because the previous worker may already have contacted a provider that lacks native idempotency.
+6. `ambiguous` blocks every new provider call until reconciliation using the bound idempotency key, provider-native IDs, effect lookup or operator evidence resolves it to `succeeded` or authoritative `failed`. If the provider offers no reliable reconciliation, the state remains blocked for manual resolution.
+7. A `single_use` grant cannot be claimed again after `failed`; a new exact grant is required. An explicitly bounded `idempotent_retry` grant may atomically re-enter `claimed` only after authoritative no-effect reconciliation, using the same logical effect and bound key with a higher fence and remaining attempt budget.
+
+A process-local mutex, a preflight read followed by a write, or a provider idempotency key without atomic local ownership does not satisfy this contract.
 
 ## Authority allocation
 
@@ -118,12 +171,30 @@ Surface names may be idiomatic, but their inputs, authority and effects must map
 | Product identity and current catalogue facts | Adapter or agent query | Shopify or authoritative source adapter | Not applicable for reads | Catalogue source | Native ID, source, observation time and completeness |
 | Representation candidate | Model, browser user or API caller | Deterministic evidence and schema validation | None | Core stores draft only | Candidate, evidence IDs and evaluation version |
 | Buyer-intent result | Core evaluator | Frozen battery and authoritative evidence | None | Core | Inputs, battery version, result and timestamp |
-| Merchant approval | Host UI or workflow | Authenticated host authority in production | Merchant policy | Core ingests envelope; does not invent it | Principal, policy, target, payload digest, issue and expiry times |
-| Shopify publication | Approved workflow | Core revalidation plus Shopify permission | Current merchant grant | Shopify executor | Idempotency key, native response, observation and rollback reference |
-| Paid preparation | Agent or operator | Core feed and approval validators | Current policy for any external write | Ads adapter | Feed digest, account scope, PAUSED state and acceptance limits |
+| Merchant approval | Host UI or workflow | Authenticated host authority in production | Merchant representation policy | Core ingests envelope; does not invent it | Tenant, principal, policy, target, representation/payload digest, issue and expiry times |
+| Exact effect grant | Approved workflow and prepared projection | Authenticated host effect authority | Channel/effect policy | Replay ledger atomically assigns one executor claim | Capability, channel, operation, destination/account, target, approval/representation/projection digests, limits, policy, expiry, revocation, replay policy and ledger state |
+| Shopify publication | Approved workflow | Core revalidation plus Shopify permission, exact effect grant and current ledger claim | Current merchant effect policy | Shopify executor owned by fencing token | Grant/claim IDs, fence, attempt, projection digest, bound idempotency key, native response, observation and rollback reference |
+| Paid preparation or write | Agent or operator | Core feed validators; exact effect authority and current ledger claim for any write | Paid-channel effect policy and budget | Ads adapter owned by fencing token | Grant/claim IDs, fence, feed/projection digest, account scope, required PAUSED state, budget limit and acceptance limits |
 | Optimisation receipt | Core | Independent semantic and digest validation | Never authorizes an effect by itself | Host stores or transmits | Complete evidence, approval context, channel declarations and digest |
+| Channel outcome observation | Provider adapter | Native event/effect lineage and deterministic attribution checks | Never authorizes an effect | Outcome observer | Tenant/product, channel/account, representation and projection digests, effect receipt/native IDs, window, source, completeness and attribution status |
 
-No delivery surface may turn readable IDs, model confidence, a receipt digest, a WebMCP tool call or possession of an API token into merchant approval.
+No delivery surface may turn readable IDs, model confidence, a receipt digest, a WebMCP tool call, provider credentials or a caller-selected idempotency key into merchant approval or an exact effect grant.
+
+## Outcome lineage and learning boundary
+
+Every `OutcomeObservation` must identify:
+
+- tenant and provider-native product target;
+- channel and native store/account;
+- approved representation digest;
+- projection digest and effect-receipt identity;
+- provider-native campaign, feed, product or equivalent effect IDs;
+- observation-window start and end;
+- source, observation time and deduplication identity;
+- whether the signal is observed, synthetic or inferred;
+- completeness and attribution status: `exact`, `partial` or `unknown`.
+
+When two representations or effects overlap an observation window, the observer must split the window using authoritative effect times or report the affected metrics as partial/unknown. Product-level totals without resolvable representation/effect lineage may inform investigation but cannot be treated as candidate lift or update the learning loop as exact evidence. Late, duplicated, contradictory and unavailable observations remain visible rather than being silently reassigned to the current representation.
 
 ## Stage 1.5 — Pluggable Core proof
 
@@ -196,7 +267,9 @@ Integrate through the platform's signed, idempotent external-agent job façade. 
 | UI and CLI implement different rules | Conflicting product truth and misleading portability claim | One core service and golden parity fixtures | Block release; remove the divergent adapter |
 | Generic contracts erase Shopify identity | Cross-product or cross-tenant effects | Preserve provider-native identity and provenance end to end | Reject unsupported mapping; require explicit adapter change |
 | Receipt becomes accidental authority | Unauthorized publication or paid effect | Receipts remain evidence artifacts; current grants are revalidated | Reject execution and record normalized denial |
-| Retry duplicates an external effect | Duplicate publication or provider cost | Idempotency keys and provider observation before retry | Reconcile native state and use rollback where supported |
+| Representation approval is reused across channels | Shopify approval authorizes an Ads effect or a new destination | Separate exact effect grant bound to capability, channel, destination, projection, limits and replay | Reject before provider execution; revoke the malformed grant |
+| Concurrent workers or retries duplicate an external effect | Duplicate publication or provider cost even with a valid single-use grant | Durable CAS replay ledger, one fenced claim owner, no automatic lease takeover and provider reconciliation | Keep ambiguous effects blocked; reconcile native state and use rollback where supported |
+| Product-level outcomes are attributed to the wrong representation | Learning loop optimizes from corrupted evidence | Require representation/effect lineage and explicit partial/unknown attribution | Quarantine the observation and re-run attribution from provider-native events |
 | Refactor destabilizes the judge journey | Submission failure despite stronger architecture | Stage 1.5 cut line, same browser acceptance and rollback by reverting the isolated branch | Defer proof and retain the current reference host |
 | Extra protocols dilute the WebMCP story | Lower judging clarity | Ship SDK + CLI only; describe API/MCP as future adapters | Remove unproven surfaces from submission narrative |
 
@@ -211,3 +284,5 @@ Integrate through the platform's signed, idempotent external-agent job façade. 
 | HTTP API timing | After persistence, authentication and idempotency | Stage 2 design-partner need |
 | MCP timing | After stable SDK/API capability contract | Agentic-platform integration need; avoid WebMCP confusion |
 | Non-Shopify support | JSON fixture proves contract portability, not provider completeness | A second authoritative catalogue adapter |
+| Effect-grant attestation | Host-signed versioned grant with revocation and durable CAS replay ledger | Stage 2 identity/provider design, storage semantics and threat model |
+| Outcome attribution source | Provider-native event/effect lineage before product-level aggregates | Shopify, Ads and referral attribution access |

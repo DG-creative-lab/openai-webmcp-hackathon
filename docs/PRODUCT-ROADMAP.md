@@ -38,7 +38,7 @@ Across every stage:
 - The model may interpret demand, propose copy, select evidence, plan tests, and explain tradeoffs.
 - Shopify, merchant systems, and verified source records attest product truth and identity.
 - Deterministic code owns schemas, lifecycle guards, hashes, budgets, and test gates.
-- The merchant owns approval for publication or paid effects.
+- The merchant owns representation approval. A production host must separately authorize each exact external effect, bound to capability, channel, destination/account, projection digest, limits/budget, expiry, revocation and replay semantics.
 - A successful simulation or synthetic score is never reported as observed commercial lift.
 - Checkout, payment, or campaign activation requires a separate product and authority decision.
 
@@ -299,9 +299,9 @@ Integrate through the target platform’s signed, idempotent external-agent job 
 | `propose_evidence_bound_representation` | Proposal | Candidate copy plus evidence bindings | No publication authority |
 | `evaluate_agent_selection` | Read/simulation | Frozen task battery and comparative result | Synthetic evidence labeled and versioned |
 | `stage_representation_for_approval` | Internal reversible effect | Approval-ready immutable candidate | Exact product, evidence and payload digest |
-| `publish_approved_representation` | External governed effect | Shopify receipt and rollback reference | Current approval envelope and native identity revalidated |
-| `prepare_paid_channel_projection` | Preview or governed effect | Feed/PAUSED Ads receipt | Account scope, approval, PAUSED state and idempotency required |
-| `observe_agent_channel_outcomes` | Read/feedback | Normalized organic/paid observations | Source identity, dedupe, completeness and time window retained |
+| `publish_approved_representation` | External governed effect | Shopify receipt and rollback reference | Exact Shopify effect grant binds capability, destination, projection, limits and replay; revalidated immediately before execution |
+| `prepare_paid_channel_projection` | Preview or governed effect | Feed/PAUSED Ads receipt | Preview needs no execution authority; any write requires an exact Ads effect grant bound to account, projection, PAUSED state, budget and replay |
+| `observe_agent_channel_outcomes` | Read/feedback | Normalized organic/paid observations | Tenant/product, channel/account, representation digest, effect lineage, native IDs, dedupe, completeness and time window retained |
 
 ### Cross-system contract
 
@@ -313,16 +313,19 @@ Conversion Lab objects map into the platform without semantic compression:
 | Evidence record | Evidence/observation | Never becomes permission or product truth without source authority |
 | Buyer-intent battery | Query battery/experiment task set | Freeze version for comparisons |
 | Representation variant | Experiment candidate | Immutable content and evidence digest |
-| Merchant approval | Workflow approval envelope | Bind principal, target, payload, evidence, policy, version and expiry |
-| Shopify/Ads effect receipt | Capability receipt | Idempotent native ID, result, uncertainty and rollback owner |
-| Outcome observation | Validation/calibration input | Keep observed, synthetic and inferred signals distinct |
+| Merchant approval | Workflow approval envelope | Bind tenant, principal, target, representation payload, evidence, policy, version and expiry; no implicit channel authority |
+| Exact effect grant | Governed capability authorization | Bind capability, channel, operation, native destination/account, target, approval/representation/projection digests, limits/budget, policy, expiry, revocation and replay semantics; consume through one durable fenced ledger claim |
+| Shopify/Ads effect receipt | Capability receipt | Retain grant/claim IDs, fencing token, attempt, projection digest, bound idempotency key, native IDs, result, uncertainty and rollback owner |
+| Outcome observation | Validation/calibration input | Bind tenant/product, channel/account, representation and projection/effect lineage, native IDs and window; keep observed, synthetic and inferred signals distinct and mark unresolved attribution partial/unknown |
 
 ### Integration acceptance
 
 - Versioned schemas and golden fixtures pass in both repositories.
-- Duplicate job delivery cannot duplicate publication or paid effects.
+- Duplicate or simultaneous job delivery cannot duplicate publication or paid effects: only one atomic replay-ledger claim may call the provider, and ambiguous outcomes block takeover until reconciliation.
+- A representation approval or Shopify-targeted effect grant cannot authorize an Ads effect, another account/destination, changed projection, larger budget or replay under a new key.
 - A platform model or memory artifact cannot manufacture merchant approval.
 - Partial, stale, unavailable, and contradictory evidence remain visible in platform summaries.
+- Overlapping representation windows and product-level outcomes without effect lineage remain partial/unknown and cannot be reported as exact candidate lift.
 - The initial integration stays within the platform’s current bounded sequential operating envelope.
 - One end-to-end job can audit, propose, pause for exact approval, execute a controlled effect, return a signed receipt, and ingest a later observation.
 

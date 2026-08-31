@@ -25,7 +25,7 @@ A judge can watch a generic listing move from 0/8 to 8/8 deterministic buyer-int
 7. No WebMCP site tool may approve or reset the demonstration workspace; UI availability is not an authorization boundary.
 8. Shopper matching requires verified evidence represented in the current visible copy; hidden merchant evidence is not discoverability.
 9. A portable receipt exists only after pre-approval evidence, a supported current approval policy, the exact approved publication, complete local Ads caveats, blocked Shopify update preview, locally valid Ads export and PAUSED projection agree. It carries approval policy/expiry context, is content-addressed and explicitly unsigned, and never implies that an external effect occurred.
-10. Every future delivery surface must preserve the same target identity, evidence, lifecycle, approval, effect and receipt semantics; a CLI, API, MCP or SDK wrapper cannot broaden authority or silently reinterpret partial success.
+10. Every future delivery surface must preserve the same target identity, evidence, lifecycle, approval, exact effect grant, durable replay-ledger ownership, outcome lineage and receipt semantics; a CLI, API, MCP or SDK wrapper cannot broaden authority, reuse approval across channels, concurrently consume one grant, or silently reinterpret partial success and unresolved attribution.
 
 ## Current adapters
 
@@ -40,9 +40,11 @@ A judge can watch a generic listing move from 0/8 to 8/8 deterministic buyer-int
 - **Catalogue source:** supplies provider-native product identity and provenance-bearing evidence.
 - **Workspace repository:** owns persistence and stale-write protection for one workspace instance.
 - **Clock:** supplies deterministic validation and issuance time.
-- **Approval authority:** supplies a host-attested principal, policy, target, digest and expiry; the core never manufactures authority.
-- **Channel projector/executor:** separates credential-free previews from governed external effects.
-- **Receipt sink/outcome observer:** transports evidence without turning it into permission and retains synthetic versus observed outcomes.
+- **Approval authority:** attests an exact representation decision; it does not authorize a channel effect by itself.
+- **Effect authority:** supplies a host-attested grant bound to capability, channel, operation, destination/account, target, approval/representation/projection digests, limits/budget, policy, expiry, revocation and replay semantics.
+- **Replay ledger:** durably owns `issued → claimed → succeeded|failed|ambiguous` transitions using atomic compare-and-set, leases and fencing; ambiguous outcomes block retry until provider reconciliation.
+- **Channel projector/executor:** separates credential-free previews from governed effects; only the current replay-ledger claim owner may revalidate and execute the exact grant.
+- **Receipt sink/outcome observer:** transports evidence without turning it into permission and binds observations to tenant/product, channel/account, representation, projection/effect receipt, native IDs and a bounded window; unresolved attribution remains partial or unknown.
 
 ## Intentionally deferred
 

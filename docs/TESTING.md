@@ -65,7 +65,9 @@ The pluggable-core work is not implemented yet. When it begins, the quality port
 | Golden snapshot parity | Web host, SDK and CLI preserve identity, evidence, audit and evaluation semantics for the same versioned input |
 | CLI contract tests | Versioned JSON stdout, stderr diagnostics, stable exit codes and no approval or external-effect commands |
 | Host-instance tests | Two engine instances cannot share lifecycle, approval, cart or activity state accidentally |
-| Authority mutation suite | CLI/API/MCP wrappers cannot broaden approval, target scope, evidence freshness or effect class |
+| Authority mutation suite | CLI/API/MCP wrappers cannot broaden approval, target scope, evidence freshness or effect class; cross-channel, changed-destination, changed-projection, raised-budget, revoked, expired and new-replay-key grants fail closed |
+| Replay-ledger schedule suite | Two workers validate the same `single_use` grant simultaneously but only one CAS claim wins and invokes a provider without native idempotency; stale fences, lease expiry and ambiguous outcomes cannot trigger a second call |
+| Outcome-lineage suite | Wrong representation/effect IDs, overlapping windows, duplicate events and product-level aggregates remain partial/unknown instead of becoming exact lift |
 | Existing browser/deployment journey | Core extraction does not regress the ten-tool visible shared-state experience |
 | Native ChatGPT acceptance | The deployed WebMCP adapter still registers and completes the actual human-agent journey |
 
